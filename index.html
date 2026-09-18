@@ -33,7 +33,6 @@
     padding: 18px 14px 40px;
   }
 
-  /* شاشة تسجيل الدخول المحدثة */
   #login-screen {
     max-width: 400px;
     margin: 80px auto 20px;
@@ -139,7 +138,7 @@
     transition: all 0.2s ease;
   }
   .add-btn:hover { background: var(--accent-dark); }
-  .add-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  button:disabled { opacity: 0.5; cursor: not-allowed !important; pointer-events: none; }
 
   #trips-app .list { padding: 6px 18px 4px; }
   #trips-app .list-title { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin: 14px 0 6px; }
@@ -174,7 +173,6 @@
     white-space: nowrap;
   }
 
-  /* شارات حالة الاعتماد */
   .badge {
     display: inline-block;
     padding: 3px 8px;
@@ -243,6 +241,11 @@
   #print-report .pr-dept { font-size: 15px; font-weight: 500; margin-top: 3px; }
   #print-report .pr-title { text-align: center; font-size: 16px; font-weight: 700; margin-bottom: 24px; }
   #print-report .pr-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  
+  /* تكرار رأس الجدول وتجنب تقطيع الصفوف عند الطباعة/PDF */
+  #print-report .pr-table thead { display: table-header-group; }
+  #print-report .pr-table tr { page-break-inside: avoid; break-inside: avoid; }
+  
   #print-report .pr-table th, #print-report .pr-table td {
     border: 1px solid #999; padding: 8px; font-size: 13px; text-align: center;
   }
@@ -406,7 +409,7 @@
       <button class="primary" id="detail-rep-pdf-btn">تنزيل تقرير المندوب التفصيلي PDF</button>
     </div>
 
-    <button class="add-btn" id="attendance-btn" style="margin:14px 18px 6px;">تقرير: مين سجّل ومين لأ</button>
+    <button class="add-btn" id="attendance-btn" style="margin:14px 18px 6px;">حاله تسجيل المندوبين للمشاوير خلال الفتره</button>
     <div id="attendance-results" style="padding:4px 18px 4px;"></div>
   </div>
 </div>
@@ -503,16 +506,21 @@
   const attendanceResults = document.getElementById('attendance-results');
   let lastAggregate = null;
   let currentActionableByRep = {};
+  
   let busyCount = 0;
   function setBusy(busy) {
     busyCount = Math.max(0, busyCount + (busy ? 1 : -1));
     const disabled = busyCount > 0;
-    document.querySelectorAll('#trips-app button').forEach(btn => { btn.disabled = disabled; });
+    document.querySelectorAll('#trips-app button, #login-screen button').forEach(btn => { 
+      btn.disabled = disabled || (btn.id === 'add-btn' && dayLocked); 
+    });
+    document.body.style.cursor = disabled ? 'wait' : 'default';
   }
+
   let lastEntries = [];
 
   const arabicDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-  const arabicMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const arabicMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يويوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
   function todayISO() {
     const d = new Date();
@@ -575,9 +583,10 @@
   }
 
   function getStatusLabel(status) {
-    if (status === 'approved_l2' || status === 'approved1') return { text: 'معتمد (مستوى 1)', class: 'badge-approved-l2' };
-    if (status === 'approved_l3' || status === 'approved') return { text: 'معتمد نهائي', class: 'badge-approved-l3' };
-    if (status === 'rejected') return { text: 'مرفوض', class: 'badge-rejected' };
+    const s = String(status || '').trim().toLowerCase();
+    if (s === 'approved_l2' || s === 'approved1') return { text: 'معتمد (مستوى 1)', class: 'badge-approved-l2' };
+    if (s === 'approved_l3' || s === 'approved') return { text: 'معتمد نهائي', class: 'badge-approved-l3' };
+    if (s === 'rejected') return { text: 'مرفوض', class: 'badge-rejected' };
     return { text: 'غير معتمد', class: 'badge-pending' };
   }
 
@@ -713,6 +722,10 @@
   });
 
   addBtn.addEventListener('click', () => {
+    if (dayLocked) {
+      showToast('⚠️ تم قفل مشاوير هذا اليوم سابقاً ولا يمكن إضافة مشاوير جديدة');
+      return;
+    }
     const from = fromInput.value.trim();
     const to = toInput.value.trim();
     const amount = parseFloat(amountInput.value);
@@ -756,34 +769,31 @@
     document.getElementById('pr-total').textContent = total.toLocaleString('ar-EG');
   }
 
-  /* تصغير حجم ملف الـ PDF عبر الضغط وصيغة JPEG */
   async function canvasToPdfBlob(canvas) {
-    const imgData = canvas.toDataURL('image/jpeg', 0.75);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
-    const footerSpace = 26; // مساحة إضافية أسفل كل صفحة لرقم الصفحة، وتفصل بصريًا بين الصفحات
+    const footerSpace = 30;
     const imgWidth = pageWidth - margin * 2;
     const imgHeight = canvas.height * (imgWidth / canvas.width);
     const usableHeight = pageHeight - margin * 2 - footerSpace;
 
-    // حساب عدد الصفحات الكلي أولاً عشان نقدر نكتب "صفحة X من Y"
     const totalPages = Math.max(1, Math.ceil(imgHeight / usableHeight));
 
     function drawFooter(pageNum) {
       if (totalPages <= 1) return;
-      pdf.setFontSize(9);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text('صفحة ' + pageNum + ' من ' + totalPages, pageWidth / 2, pageHeight - 12, { align: 'center' });
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Page ' + pageNum + ' of ' + totalPages, pageWidth / 2, pageHeight - 15, { align: 'center' });
     }
 
     let heightLeft = imgHeight;
     let position = margin;
     let pageNum = 1;
 
-    pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
     drawFooter(pageNum);
     heightLeft -= usableHeight;
 
@@ -791,93 +801,12 @@
       pageNum++;
       position = margin - (imgHeight - heightLeft);
       pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
       drawFooter(pageNum);
       heightLeft -= usableHeight;
     }
 
     return pdf.output('blob');
-  }
-
-  async function generateReportPDFBlob() {
-    fillPrintReport();
-    const reportEl = document.getElementById('print-report');
-    reportEl.style.display = 'block';
-    reportEl.style.position = 'fixed';
-    reportEl.style.top = '0';
-    reportEl.style.left = '-99999px';
-
-    await new Promise(r => setTimeout(r, 60));
-    const canvas = await html2canvas(reportEl, { scale: 1.5, backgroundColor: '#ffffff' });
-
-    reportEl.style.display = 'none';
-    reportEl.style.position = '';
-    reportEl.style.left = '';
-
-    return canvasToPdfBlob(canvas);
-  }
-
-  async function generateAggregatePDFBlob(fromDate, toDate, perRep, grandTotal) {
-    const cellStyle = 'border:1px solid #999;padding:8px;font-size:13px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
-    let rowsHtml = '';
-    let idx = 1;
-    Object.keys(perRep).forEach(rep => {
-      rowsHtml += '<tr>' +
-        '<td style="' + cellStyle + '">' + (idx++) + '</td>' +
-        '<td style="' + cellStyle + '">' + escapeHtml(rep) + '</td>' +
-        '<td style="' + cellStyle + '">' + perRep[rep].count + '</td>' +
-        '<td style="' + cellStyle + '">' + perRep[rep].rejected + '</td>' +
-        '<td style="' + cellStyle + '">' + perRep[rep].total.toLocaleString('ar-EG') + '</td>' +
-        '<td style="' + cellStyle + '">' + (perRep[rep].l2.length ? escapeHtml(perRep[rep].l2.join('، ')) : '—') + '</td>' +
-        '<td style="' + cellStyle + '">' + (perRep[rep].l3.length ? escapeHtml(perRep[rep].l3.join('، ')) : '—') + '</td>' +
-      '</tr>';
-    });
-
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.top = '0';
-    container.style.left = '-99999px';
-    container.style.width = '794px';
-    container.style.background = '#ffffff';
-    container.style.fontFamily = "'Tajawal', sans-serif";
-    container.setAttribute('dir', 'rtl');
-    container.style.color = '#1a1a1a';
-    container.style.padding = '34px 40px';
-    container.style.boxSizing = 'border-box';
-
-    container.innerHTML =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
-      '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:24px;">' +
-        'تقرير إجمالي الانتقالات من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
-      '</div>' +
-      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
-        '<thead><tr>' +
-          '<th style="' + thStyle + '">م</th>' +
-          '<th style="' + thStyle + '">المندوب</th>' +
-          '<th style="' + thStyle + '">عدد المشاوير</th>' +
-          '<th style="' + thStyle + '">عدد المرفوض</th>' +
-          '<th style="' + thStyle + '">الإجمالي (ج.م)</th>' +
-          '<th style="' + thStyle + '">اعتماد أول</th>' +
-          '<th style="' + thStyle + '">اعتماد نهائي</th>' +
-        '</tr></thead>' +
-        '<tbody>' + rowsHtml + '</tbody>' +
-      '</table>' +
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي الكلي: ' + grandTotal.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
-        '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
-        '<div>يعتمد: ______________________</div>' +
-      '</div>';
-
-    document.body.appendChild(container);
-    await new Promise(r => setTimeout(r, 60)); // إصلاح توقف تجميد وعدم تنفيذ الوعد
-    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
-    document.body.removeChild(container);
-
-    return canvasToPdfBlob(canvas);
   }
 
   async function generateDetailedRepPDFBlob(repName, fromDate, toDate, rows) {
@@ -947,6 +876,148 @@
 
     document.body.appendChild(container);
     await new Promise(r => setTimeout(r, 60));
+    
+    // استخدام تقسيم تلقائي ذكي للجدول لمنع قطع الصفوف في النصف
+    const canvas = await html2canvas(container, { 
+      scale: 2, 
+      backgroundColor: '#ffffff',
+      windowWidth: 794
+    });
+    
+    document.body.removeChild(container);
+    return canvasToPdfBlob(canvas);
+  }
+
+  async function generateAggregatePDFBlob(fromDate, toDate, perRep, grandTotal) {
+    const cellStyle = 'border:1px solid #999;padding:8px;font-size:13px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
+    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    let rowsHtml = '';
+    let idx = 1;
+    Object.keys(perRep).forEach(rep => {
+      rowsHtml += '<tr style="page-break-inside:avoid;break-inside:avoid;">' +
+        '<td style="' + cellStyle + '">' + (idx++) + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(rep) + '</td>' +
+        '<td style="' + cellStyle + '">' + perRep[rep].count + '</td>' +
+        '<td style="' + cellStyle + '">' + perRep[rep].rejected + '</td>' +
+        '<td style="' + cellStyle + '">' + perRep[rep].total.toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + (perRep[rep].l2.length ? escapeHtml(perRep[rep].l2.join('، ')) : '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + (perRep[rep].l3.length ? escapeHtml(perRep[rep].l3.join('، ')) : '—') + '</td>' +
+      '</tr>';
+    });
+
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '-99999px';
+    container.style.width = '794px';
+    container.style.background = '#ffffff';
+    container.style.fontFamily = "'Tajawal', sans-serif";
+    container.setAttribute('dir', 'rtl');
+    container.style.color = '#1a1a1a';
+    container.style.padding = '34px 40px';
+    container.style.boxSizing = 'border-box';
+
+    container.innerHTML =
+      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '</div>' +
+      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:24px;">' +
+        'تقرير إجمالي الانتقالات من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
+        '<thead style="display:table-header-group;"><tr>' +
+          '<th style="' + thStyle + '">م</th>' +
+          '<th style="' + thStyle + '">المندوب</th>' +
+          '<th style="' + thStyle + '">عدد المشاوير</th>' +
+          '<th style="' + thStyle + '">عدد المرفوض</th>' +
+          '<th style="' + thStyle + '">الإجمالي (ج.م)</th>' +
+          '<th style="' + thStyle + '">اعتماد أول</th>' +
+          '<th style="' + thStyle + '">اعتماد نهائي</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table>' +
+      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي الكلي: ' + grandTotal.toLocaleString('ar-EG') + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+        '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
+        '<div>يعتمد: ______________________</div>' +
+      '</div>';
+
+    document.body.appendChild(container);
+    await new Promise(r => setTimeout(r, 60));
+    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+    document.body.removeChild(container);
+
+    return canvasToPdfBlob(canvas);
+  }
+
+  async function generateDetailedRepPDFBlob(repName, fromDate, toDate, rows) {
+    const mine = rows.filter(r => (r.rep || r.user) === repName);
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
+    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    let rowsHtml = '';
+    let total = 0;
+    mine.forEach((t, i) => {
+      const st = getStatusLabel(t.status);
+      total += Number(t.amount || 0);
+      rowsHtml += '<tr style="page-break-inside:avoid;break-inside:avoid;">' +
+        '<td style="' + cellStyle + '">' + (i + 1) + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.date || '') + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
+        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + st.text + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + (t.notes ? escapeHtml(t.notes) : '—') + '</td>' +
+      '</tr>';
+    });
+
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '-99999px';
+    container.style.width = '794px';
+    container.style.background = '#ffffff';
+    container.style.fontFamily = "'Tajawal', sans-serif";
+    container.setAttribute('dir', 'rtl');
+    container.style.color = '#1a1a1a';
+    container.style.padding = '34px 40px';
+    container.style.boxSizing = 'border-box';
+
+    container.innerHTML =
+      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '</div>' +
+      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:6px;">' +
+        'تقرير تفصيلي — المندوب: ' + escapeHtml(repName) +
+      '</div>' +
+      '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:20px;">' +
+        'من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
+        '<thead style="display:table-header-group;"><tr>' +
+          '<th style="' + thStyle + '">م</th>' +
+          '<th style="' + thStyle + '">التاريخ</th>' +
+          '<th style="' + thStyle + '">من</th>' +
+          '<th style="' + thStyle + '">إلى</th>' +
+          '<th style="' + thStyle + '">المبلغ</th>' +
+          '<th style="' + thStyle + '">الحالة</th>' +
+          '<th style="' + thStyle + '">اعتماد أول</th>' +
+          '<th style="' + thStyle + '">اعتماد ثاني</th>' +
+          '<th style="' + thStyle + '">ملاحظات</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table>' +
+      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+        '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
+        '<div>يعتمد: ______________________</div>' +
+      '</div>';
+
+    document.body.appendChild(container);
+    await new Promise(r => setTimeout(r, 60));
     const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
     document.body.removeChild(container);
 
@@ -956,6 +1027,7 @@
   detailRepPdfBtn.addEventListener('click', async () => {
     const repName = detailRepSelect.value;
     if (!repName || !lastAggregate) { showToast('اعرض المشاوير الأول'); return; }
+    setBusy(true);
     showToast('جاري إعداد التقرير التفصيلي...');
     try {
       const blob = await generateDetailedRepPDFBlob(repName, lastAggregate.fromDate, lastAggregate.toDate, lastEntries);
@@ -963,6 +1035,8 @@
       showToast('تم تنزيل التقرير التفصيلي');
     } catch (e) {
       showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setBusy(false);
     }
   });
 
@@ -1021,23 +1095,26 @@
     const originalLabel = saveBtn.textContent;
     saveBtn.textContent = 'جاري الحفظ...';
     showToast('جاري الحفظ...');
-    let okCount = 0;
-    for (const t of unsent) {
-      if (t.sent) { okCount++; continue; } // احتياطًا: لو اتحفظ فعلاً في لفة سابقة
-      const ok = await trySendTrip(t);
-      if (ok) okCount++;
+    try {
+      let okCount = 0;
+      for (const t of unsent) {
+        if (t.sent) { okCount++; continue; }
+        const ok = await trySendTrip(t);
+        if (ok) okCount++;
+      }
+      if (okCount === unsent.length) {
+        showToast('جاري قفل اليوم بعد الحفظ...');
+        try {
+          await jsonpRequest(apiUrl({ action: 'lock_day', date: currentDate }));
+        } catch (e) { }
+        showToast('تم الحفظ وقفل اليوم');
+        await loadTrips(currentDate);
+      }
+    } finally {
+      isSaving = false;
+      setBusy(false);
+      saveBtn.textContent = originalLabel;
     }
-    if (okCount === unsent.length) {
-      showToast('جاري قفل اليوم بعد الحفظ...');
-      try {
-        await jsonpRequest(apiUrl({ action: 'lock_day', date: currentDate }));
-      } catch (e) { /* حتى لو فشل القفل، البيانات نفسها اتحفظت بنجاح */ }
-      showToast('تم الحفظ وقفل اليوم');
-      await loadTrips(currentDate);
-    }
-    isSaving = false;
-    setBusy(false);
-    saveBtn.textContent = originalLabel;
   });
 
   async function fetchAllTripsInRange(fromDate, toDate) {
@@ -1058,7 +1135,8 @@
       const amt = Number(r.amount || 0);
       perRep[repName].total += amt;
       perRep[repName].count += 1;
-      if (r.status === 'rejected') perRep[repName].rejected += 1;
+      const st = String(r.status || '').trim().toLowerCase();
+      if (st === 'rejected') perRep[repName].rejected += 1;
       if (r.approver_l2 && perRep[repName].l2.indexOf(r.approver_l2) === -1) perRep[repName].l2.push(r.approver_l2);
       if (r.approver_l3 && perRep[repName].l3.indexOf(r.approver_l3) === -1) perRep[repName].l3.push(r.approver_l3);
       grandTotal += amt;
@@ -1066,13 +1144,18 @@
     return { perRep, grandTotal };
   }
 
-  // فلترة المشاوير بحيث يظهر للمستوى فقط ما هو في انتظار اعتماده
   function myScopeTrips(rows) {
     if (currentUser.role === 'level2') {
-      return rows.filter(t => t.status === 'submitted' || !t.status || t.status === 'pending');
+      return rows.filter(t => {
+        const s = String(t.status || '').trim().toLowerCase();
+        return s === 'submitted' || s === '' || s === 'pending';
+      });
     }
     if (currentUser.role === 'level3') {
-      return rows.filter(t => t.status === 'approved_l2' || t.status === 'approved1');
+      return rows.filter(t => {
+        const s = String(t.status || '').trim().toLowerCase();
+        return s === 'approved_l2' || s === 'approved1';
+      });
     }
     return [];
   }
@@ -1175,12 +1258,12 @@
           try {
             const data = await jsonpRequest(apiUrl({ action: 'approve', id: t.id }));
             if (data && data.status === 'ok') okCount++;
-          } catch (e) { /* تجاهل وواصل الباقي */ }
+          } catch (e) { }
         }
         showToast('تم اعتماد ' + okCount + ' من ' + rows.length + ' مشوار');
+        await fetchAndRenderReport(repName);
       } finally {
         setBusy(false);
-        reportBtn.click();
       }
     });
 
@@ -1200,12 +1283,12 @@
           try {
             const data = await jsonpRequest(apiUrl({ action: 'approve', id: id }));
             if (data && data.status === 'ok') okCount++;
-          } catch (e) { /* تجاهل وواصل الباقي */ }
+          } catch (e) { }
         }
         showToast('تم اعتماد ' + okCount + ' من ' + ids.length + ' مشوار');
+        await fetchAndRenderReport(repName);
       } finally {
         setBusy(false);
-        reportBtn.click();
       }
     });
 
@@ -1221,12 +1304,12 @@
           try {
             const data = await jsonpRequest(apiUrl({ action: 'reject', id: id }));
             if (data && data.status === 'ok') okCount++;
-          } catch (e) { /* تجاهل وواصل الباقي */ }
+          } catch (e) { }
         }
         showToast('تم رفض ' + okCount + ' من ' + ids.length + ' مشوار');
+        await fetchAndRenderReport(repName);
       } finally {
         setBusy(false);
-        reportBtn.click();
       }
     });
 
@@ -1241,7 +1324,7 @@
           const data = await jsonpRequest(apiUrl({ action: 'update', id: id, amount: amountEl.value, notes: notesEl.value }));
           if (data && data.status === 'ok') {
             showToast('تم حفظ التعديل');
-            reportBtn.click();
+            await fetchAndRenderReport(repName);
           } else {
             showToast((data && data.message) ? data.message : 'حدث خطأ أثناء التعديل');
           }
@@ -1262,7 +1345,7 @@
           const data = await jsonpRequest(apiUrl({ action: 'approve', id: id }));
           if (data && data.status === 'ok') {
             showToast('تم الاعتماد بنجاح');
-            reportBtn.click();
+            await fetchAndRenderReport(repName);
           } else {
             showToast((data && data.message) ? data.message : 'حدث خطأ في الاعتماد');
           }
@@ -1284,7 +1367,7 @@
           const data = await jsonpRequest(apiUrl({ action: 'reject', id: id }));
           if (data && data.status === 'ok') {
             showToast('تم رفض المشوار وتصفير قيمته');
-            reportBtn.click();
+            await fetchAndRenderReport(repName);
           } else {
             showToast((data && data.message) ? data.message : 'حدث خطأ في الرفض');
           }
@@ -1304,7 +1387,7 @@
   function renderAdminDashboard(rows) {
     const totalTrips = rows.length;
     const totalAmount = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
-    const rejectedCount = rows.filter(r => r.status === 'rejected').length;
+    const rejectedCount = rows.filter(r => String(r.status || '').trim().toLowerCase() === 'rejected').length;
     const repsSet = {};
     rows.forEach(r => { repsSet[r.rep || r.user || 'بدون اسم'] = true; });
     const repsCount = Object.keys(repsSet).length;
@@ -1350,6 +1433,7 @@
   async function loadUserManagement() {
     const listDiv = document.getElementById('user-mgmt-list');
     listDiv.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;">جاري التحميل...</div>';
+    setBusy(true);
     try {
       const users = await jsonpRequest(apiUrl({ action: 'list_users' }));
       if (!Array.isArray(users)) {
@@ -1377,12 +1461,17 @@
         btn.addEventListener('click', async () => {
           const username = btn.getAttribute('data-username');
           const currentlyDisabled = btn.getAttribute('data-disabled') === 'true';
-          const data = await jsonpRequest(apiUrl({ action: 'set_user_status', target_username: username, disabled: (!currentlyDisabled).toString() }));
-          if (data && data.status === 'ok') {
-            showToast('تم التحديث');
-            loadUserManagement();
-          } else {
-            showToast((data && data.message) || 'حصل خطأ');
+          setBusy(true);
+          try {
+            const data = await jsonpRequest(apiUrl({ action: 'set_user_status', target_username: username, disabled: (!currentlyDisabled).toString() }));
+            if (data && data.status === 'ok') {
+              showToast('تم التحديث');
+              await loadUserManagement();
+            } else {
+              showToast((data && data.message) || 'حصل خطأ');
+            }
+          } finally {
+            setBusy(false);
           }
         });
       });
@@ -1392,21 +1481,48 @@
           const username = btn.getAttribute('data-username');
           const newPw = prompt('اكتب كلمة السر الجديدة لـ ' + username);
           if (!newPw) return;
-          const data = await jsonpRequest(apiUrl({ action: 'admin_reset_password', target_username: username, new_password: newPw }));
-          showToast(data && data.status === 'ok' ? 'تم تغيير كلمة السر' : ((data && data.message) || 'حصل خطأ'));
+          setBusy(true);
+          try {
+            const data = await jsonpRequest(apiUrl({ action: 'admin_reset_password', target_username: username, new_password: newPw }));
+            showToast(data && data.status === 'ok' ? 'تم تغيير كلمة السر' : ((data && data.message) || 'حصل خطأ'));
+          } finally {
+            setBusy(false);
+          }
         });
       });
     } catch (e) {
       listDiv.innerHTML = '<div style="text-align:center;color:var(--danger);font-size:13px;">خطأ: ' + (e && e.message ? e.message : String(e)) + '</div>';
+    } finally {
+      setBusy(false);
     }
   }
 
-
-  function renderReportResults(rows, fromDate, toDate) {
+  function renderReportResults(rows, fromDate, toDate, activeRepName) {
     const { perRep, grandTotal } = aggregateEntries(rows);
     lastAggregate = { fromDate: fromDate, toDate: toDate, perRep: perRep, grandTotal: grandTotal };
 
-    renderApproveList(rows);
+    if (currentUser.role === 'admin') {
+      renderAdminDashboard(rows);
+    } else {
+      const mine = myScopeTrips(rows);
+      if (mine.length === 0) {
+        approveList.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:12px 0;">مفيش مشاوير في انتظار اعتمادك حالياً</div>';
+      } else {
+        const byRep = {};
+        mine.forEach(t => {
+          const rep = t.rep || t.user || 'بدون اسم';
+          if (!byRep[rep]) byRep[rep] = [];
+          byRep[rep].push(t);
+        });
+        currentActionableByRep = byRep;
+        
+        if (activeRepName && byRep[activeRepName] && byRep[activeRepName].length > 0) {
+          renderRepActionableRows(activeRepName, byRep[activeRepName]);
+        } else {
+          renderRepPickerList(byRep);
+        }
+      }
+    }
 
     let html = '<div class="list-title">إجمالي الانتقالات حسب المندوب (' + rows.length + ' مشوار)</div>';
     const reps = Object.keys(perRep);
@@ -1443,29 +1559,37 @@
     reportActions.style.display = 'flex';
   }
 
-  reportBtn.addEventListener('click', async () => {
+  async function fetchAndRenderReport(activeRepName) {
     const fromDate = reportFrom.value || todayISO();
     const toDate = reportTo.value || todayISO();
-    reportBtn.disabled = true;
+    setBusy(true);
     reportBtn.textContent = 'جاري تحميل البيانات...';
+    try {
+      const rows = await fetchAllTripsInRange(fromDate, toDate);
+      if (rows === null) {
+        reportResults.innerHTML = '<div class="empty">تعذر تحميل البيانات — يرجى إعادة المحاولة</div>';
+        detailRepRow.style.display = 'none';
+        detailRepActions.style.display = 'none';
+      } else {
+        lastEntries = rows;
+        renderReportResults(rows, fromDate, toDate, activeRepName);
+      }
+    } finally {
+      setBusy(false);
+      reportBtn.textContent = 'عرض المشاوير';
+    }
+  }
+
+  reportBtn.addEventListener('click', async () => {
     approveList.innerHTML = '';
     reportResults.innerHTML = '';
     reportActions.style.display = 'none';
-    const rows = await fetchAllTripsInRange(fromDate, toDate);
-    if (rows === null) {
-      reportResults.innerHTML = '<div class="empty">تعذر تحميل البيانات — يرجى إعادة المحاولة</div>';
-      detailRepRow.style.display = 'none';
-      detailRepActions.style.display = 'none';
-    } else {
-      lastEntries = rows;
-      renderReportResults(rows, fromDate, toDate);
-    }
-    reportBtn.disabled = false;
-    reportBtn.textContent = 'عرض المشاوير';
+    fetchAndRenderReport();
   });
 
   reportPdfBtn.addEventListener('click', async () => {
     if (!lastAggregate) return;
+    setBusy(true);
     showToast('جاري إعداد تقرير PDF الإجمالي...');
     try {
       const blob = await generateAggregatePDFBlob(lastAggregate.fromDate, lastAggregate.toDate, lastAggregate.perRep, lastAggregate.grandTotal);
@@ -1473,10 +1597,10 @@
       showToast('تم تنزيل التقرير الإجمالي بنجاح');
     } catch (e) {
       showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setBusy(false);
     }
   });
-
-  // ---------- تسجيل الدخول والخروج ----------
 
   function applyRoleUI() {
     if (currentUser.role === 'rep') {
@@ -1528,6 +1652,7 @@
       pwMsg.textContent = 'كلمة المرور الجديدة قصيرة جدًا';
       return;
     }
+    setBusy(true);
     pwMsg.style.color = 'var(--ink-soft)';
     pwMsg.textContent = 'جاري التغيير...';
     try {
@@ -1551,9 +1676,10 @@
     } catch (e) {
       pwMsg.style.color = 'var(--danger)';
       pwMsg.textContent = 'خطأ: ' + (e && e.message ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
   });
-
 
   function doLogin() {
     const username = loginUsername.value.trim();
@@ -1562,17 +1688,12 @@
       loginError.textContent = 'اكتب اسم المستخدم وكلمة المرور';
       return;
     }
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'جاري تسجيل الدخول...';
+    setBusy(true);
     loginError.textContent = '';
-
-    // مسح المحافظة عند كل تسجيل دخول وعدم الاحتفاظ بالبيانات القديمة
     govInput.value = '';
 
     const url = SHEET_API_URL + '?action=login&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
     jsonpRequest(url).then(data => {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'دخول';
       if (data && data.status === 'ok') {
         currentUser = { username: username, password: password, role: data.role, name: data.name || username };
         try {
@@ -1589,9 +1710,9 @@
         loginError.textContent = (data && data.message) ? data.message : 'بيانات الدخول غير صحيحة';
       }
     }).catch(e => {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'دخول';
       loginError.textContent = 'خطأ في الاتصال: ' + (e && e.message ? e.message : String(e));
+    }).finally(() => {
+      setBusy(false);
     });
   }
 
@@ -1615,7 +1736,7 @@
       const saved = sessionStorage.getItem('trips-user');
       if (saved) {
         currentUser = JSON.parse(saved);
-        govInput.value = ''; // تصفير المحافظة دائماً
+        govInput.value = '';
         loginScreen.style.display = 'none';
         root.style.display = '';
         repInput.value = currentUser.name;
@@ -1628,8 +1749,6 @@
       currentUser = null;
     }
   })();
-
-  // ---------- مشاركة ونسخ وتنزيل (للمندوب) ----------
 
   function buildShareText() {
     const total = currentTrips.reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -1652,6 +1771,7 @@
 
   shareBtn.addEventListener('click', async () => {
     if (currentTrips.length === 0) { showToast('مفيش مشاوير للمشاركة'); return; }
+    setBusy(true);
     showToast('جاري تجهيز تقرير PDF...');
     try {
       const blob = await generateReportPDFBlob();
@@ -1666,6 +1786,8 @@
     } catch (e) {
       if (e && e.name === 'AbortError') return;
       showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setBusy(false);
     }
   });
 
@@ -1681,6 +1803,7 @@
 
   pdfBtn.addEventListener('click', async () => {
     if (currentTrips.length === 0) { showToast('مفيش مشاوير للتصدير'); return; }
+    setBusy(true);
     showToast('جاري إعداد تقرير PDF...');
     try {
       const blob = await generateReportPDFBlob();
@@ -1688,6 +1811,8 @@
       showToast('تم التنزيل بنجاح');
     } catch (e) {
       showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setBusy(false);
     }
   });
 
