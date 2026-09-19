@@ -769,133 +769,82 @@
     document.getElementById('pr-total').textContent = total.toLocaleString('ar-EG');
   }
 
-  async function canvasToPdfBlob(canvas) {
+  // ملاحظة: تم استبدال الطريقة القديمة (تصوير صفحة واحدة طويلة وتقطيعها) بالكامل
+  // بنظام "صفحة لكل canvas" أدناه — أدق وأصح مع الجداول، ويحل مشكلة ترقيم الصفحات بالعربي.
+
+  // يحوّل مجموعة صفحات (كل صفحة عبارة عن canvas مستقل) إلى ملف PDF — كل صفحة بحجمها الطبيعي
+  // من غير أي قص لمنتصف الصفوف. ترقيم الصفحات بيتكتب جوه الصورة نفسها (مش عن طريق jsPDF)
+  // عشان jsPDF مبيدعمش رسم النص العربي بشكل صحيح فيطلع مشوّه لو استخدمناه مباشرة.
+  async function canvasesToPdfBlob(canvases) {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
-    const footerSpace = 30;
-    const imgWidth = pageWidth - margin * 2;
-    const imgHeight = canvas.height * (imgWidth / canvas.width);
-    const usableHeight = pageHeight - margin * 2 - footerSpace;
 
-    const totalPages = Math.max(1, Math.ceil(imgHeight / usableHeight));
-
-    function drawFooter(pageNum) {
-      if (totalPages <= 1) return;
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('Page ' + pageNum + ' of ' + totalPages, pageWidth / 2, pageHeight - 15, { align: 'center' });
-    }
-
-    let heightLeft = imgHeight;
-    let position = margin;
-    let pageNum = 1;
-
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
-    drawFooter(pageNum);
-    heightLeft -= usableHeight;
-
-    while (heightLeft > 0) {
-      pageNum++;
-      position = margin - (imgHeight - heightLeft);
-      pdf.addPage();
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
-      drawFooter(pageNum);
-      heightLeft -= usableHeight;
-    }
+    canvases.forEach((canvas, idx) => {
+      if (idx > 0) pdf.addPage();
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = canvas.height * (imgWidth / canvas.width);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight, undefined, 'FAST');
+    });
 
     return pdf.output('blob');
   }
 
-  async function generateDetailedRepPDFBlob(repName, fromDate, toDate, rows) {
-    const mine = rows.filter(r => (r.rep || r.user) === repName);
-    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
-    let rowsHtml = '';
-    let total = 0;
-    mine.forEach((t, i) => {
-      const st = getStatusLabel(t.status);
-      total += Number(t.amount || 0);
-      rowsHtml += '<tr>' +
-        '<td style="' + cellStyle + '">' + (i + 1) + '</td>' +
-        '<td style="' + cellStyle + '">' + escapeHtml(t.date || '') + '</td>' +
-        '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
-        '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
-        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
-        '<td style="' + cellStyle + '">' + st.text + '</td>' +
-        '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
-        '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
-        '<td style="' + cellStyle + '">' + (t.notes ? escapeHtml(t.notes) : '—') + '</td>' +
-      '</tr>';
-    });
+  // يبني تقرير جدولي مقسّم فعليًا على صفحات: كل صفحة فيها نفس رأس الصفحة الأولى بالكامل
+  // (شعار الشركة + العنوان + رأس الجدول) متكرر، وعدد صفوف محدود بيضمن عدم قطع أي صف بين صفحتين.
+  async function buildPaginatedTablePdf(headerHtml, theadHtml, bodyRowsHtmlArray, footerHtml, rowsPerPage) {
+    rowsPerPage = rowsPerPage || 18;
+    const totalRows = bodyRowsHtmlArray.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+    const canvases = [];
 
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.top = '0';
-    container.style.left = '-99999px';
-    container.style.width = '794px';
-    container.style.background = '#ffffff';
-    container.style.fontFamily = "'Tajawal', sans-serif";
-    container.setAttribute('dir', 'rtl');
-    container.style.color = '#1a1a1a';
-    container.style.padding = '34px 40px';
-    container.style.boxSizing = 'border-box';
+    for (let p = 0; p < totalPages; p++) {
+      const pageRows = bodyRowsHtmlArray.slice(p * rowsPerPage, (p + 1) * rowsPerPage);
+      const isLastPage = (p === totalPages - 1);
 
-    container.innerHTML =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
-      '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:6px;">' +
-        'تقرير تفصيلي — المندوب: ' + escapeHtml(repName) +
-      '</div>' +
-      '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:20px;">' +
-        'من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
-      '</div>' +
-      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
-        '<thead><tr>' +
-          '<th style="' + thStyle + '">م</th>' +
-          '<th style="' + thStyle + '">التاريخ</th>' +
-          '<th style="' + thStyle + '">من</th>' +
-          '<th style="' + thStyle + '">إلى</th>' +
-          '<th style="' + thStyle + '">المبلغ</th>' +
-          '<th style="' + thStyle + '">الحالة</th>' +
-          '<th style="' + thStyle + '">اعتماد أول</th>' +
-          '<th style="' + thStyle + '">اعتماد ثاني</th>' +
-          '<th style="' + thStyle + '">ملاحظات</th>' +
-        '</tr></thead>' +
-        '<tbody>' + rowsHtml + '</tbody>' +
-      '</table>' +
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
-        '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
-        '<div>يعتمد: ______________________</div>' +
-      '</div>';
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.top = '0';
+      container.style.left = '-99999px';
+      container.style.width = '794px';
+      container.style.background = '#ffffff';
+      container.style.fontFamily = "'Tajawal', sans-serif";
+      container.setAttribute('dir', 'rtl');
+      container.style.color = '#1a1a1a';
+      container.style.padding = '34px 40px';
+      container.style.boxSizing = 'border-box';
 
-    document.body.appendChild(container);
-    await new Promise(r => setTimeout(r, 60));
-    
-    // استخدام تقسيم تلقائي ذكي للجدول لمنع قطع الصفوف في النصف
-    const canvas = await html2canvas(container, { 
-      scale: 2, 
-      backgroundColor: '#ffffff',
-      windowWidth: 794
-    });
-    
-    document.body.removeChild(container);
-    return canvasToPdfBlob(canvas);
+      container.innerHTML =
+        headerHtml +
+        '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
+          '<thead><tr>' + theadHtml + '</tr></thead>' +
+          '<tbody>' + pageRows.join('') + '</tbody>' +
+        '</table>' +
+        (isLastPage ? footerHtml : '') +
+        (totalPages > 1
+          ? '<div style="text-align:center;font-size:11px;color:#888;margin-top:14px;">صفحة ' + (p + 1) + ' من ' + totalPages + '</div>'
+          : '');
+
+      document.body.appendChild(container);
+      await new Promise(r => setTimeout(r, 40));
+      const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+      document.body.removeChild(container);
+      canvases.push(canvas);
+    }
+
+    return canvasesToPdfBlob(canvases);
   }
 
+
   async function generateAggregatePDFBlob(fromDate, toDate, perRep, grandTotal) {
-    const cellStyle = 'border:1px solid #999;padding:8px;font-size:13px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
+    const cellStyle = 'border:1px solid #999;padding:8px;font-size:13px;text-align:center;';
     const thStyle = cellStyle + 'background:#eee;font-weight:700;';
-    let rowsHtml = '';
-    let idx = 1;
-    Object.keys(perRep).forEach(rep => {
-      rowsHtml += '<tr style="page-break-inside:avoid;break-inside:avoid;">' +
-        '<td style="' + cellStyle + '">' + (idx++) + '</td>' +
+
+    const rowsArray = Object.keys(perRep).map((rep, idx) => {
+      return '<tr>' +
+        '<td style="' + cellStyle + '">' + (idx + 1) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(rep) + '</td>' +
         '<td style="' + cellStyle + '">' + perRep[rep].count + '</td>' +
         '<td style="' + cellStyle + '">' + perRep[rep].rejected + '</td>' +
@@ -905,62 +854,44 @@
       '</tr>';
     });
 
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.top = '0';
-    container.style.left = '-99999px';
-    container.style.width = '794px';
-    container.style.background = '#ffffff';
-    container.style.fontFamily = "'Tajawal', sans-serif";
-    container.setAttribute('dir', 'rtl');
-    container.style.color = '#1a1a1a';
-    container.style.padding = '34px 40px';
-    container.style.boxSizing = 'border-box';
-
-    container.innerHTML =
+    const headerHtml =
       '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
         '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
         '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
       '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:24px;">' +
         'تقرير إجمالي الانتقالات من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
-      '</div>' +
-      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
-        '<thead style="display:table-header-group;"><tr>' +
-          '<th style="' + thStyle + '">م</th>' +
-          '<th style="' + thStyle + '">المندوب</th>' +
-          '<th style="' + thStyle + '">عدد المشاوير</th>' +
-          '<th style="' + thStyle + '">عدد المرفوض</th>' +
-          '<th style="' + thStyle + '">الإجمالي (ج.م)</th>' +
-          '<th style="' + thStyle + '">اعتماد أول</th>' +
-          '<th style="' + thStyle + '">اعتماد نهائي</th>' +
-        '</tr></thead>' +
-        '<tbody>' + rowsHtml + '</tbody>' +
-      '</table>' +
+      '</div>';
+
+    const theadHtml =
+      '<th style="' + thStyle + '">م</th>' +
+      '<th style="' + thStyle + '">المندوب</th>' +
+      '<th style="' + thStyle + '">عدد المشاوير</th>' +
+      '<th style="' + thStyle + '">عدد المرفوض</th>' +
+      '<th style="' + thStyle + '">الإجمالي (ج.م)</th>' +
+      '<th style="' + thStyle + '">اعتماد أول</th>' +
+      '<th style="' + thStyle + '">اعتماد نهائي</th>';
+
+    const footerHtml =
       '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي الكلي: ' + grandTotal.toLocaleString('ar-EG') + ' ج.م</div>' +
       '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
         '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
 
-    document.body.appendChild(container);
-    await new Promise(r => setTimeout(r, 60));
-    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
-    document.body.removeChild(container);
-
-    return canvasToPdfBlob(canvas);
+    return buildPaginatedTablePdf(headerHtml, theadHtml, rowsArray, footerHtml, 16);
   }
 
   async function generateDetailedRepPDFBlob(repName, fromDate, toDate, rows) {
     const mine = rows.filter(r => (r.rep || r.user) === repName);
-    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
     const thStyle = cellStyle + 'background:#eee;font-weight:700;';
-    let rowsHtml = '';
     let total = 0;
-    mine.forEach((t, i) => {
+
+    const rowsArray = mine.map((t, i) => {
       const st = getStatusLabel(t.status);
       total += Number(t.amount || 0);
-      rowsHtml += '<tr style="page-break-inside:avoid;break-inside:avoid;">' +
+      return '<tr>' +
         '<td style="' + cellStyle + '">' + (i + 1) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.date || '') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
@@ -973,19 +904,7 @@
       '</tr>';
     });
 
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.top = '0';
-    container.style.left = '-99999px';
-    container.style.width = '794px';
-    container.style.background = '#ffffff';
-    container.style.fontFamily = "'Tajawal', sans-serif";
-    container.setAttribute('dir', 'rtl');
-    container.style.color = '#1a1a1a';
-    container.style.padding = '34px 40px';
-    container.style.boxSizing = 'border-box';
-
-    container.innerHTML =
+    const headerHtml =
       '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
         '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
         '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
@@ -995,33 +914,80 @@
       '</div>' +
       '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:20px;">' +
         'من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
-      '</div>' +
-      '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
-        '<thead style="display:table-header-group;"><tr>' +
-          '<th style="' + thStyle + '">م</th>' +
-          '<th style="' + thStyle + '">التاريخ</th>' +
-          '<th style="' + thStyle + '">من</th>' +
-          '<th style="' + thStyle + '">إلى</th>' +
-          '<th style="' + thStyle + '">المبلغ</th>' +
-          '<th style="' + thStyle + '">الحالة</th>' +
-          '<th style="' + thStyle + '">اعتماد أول</th>' +
-          '<th style="' + thStyle + '">اعتماد ثاني</th>' +
-          '<th style="' + thStyle + '">ملاحظات</th>' +
-        '</tr></thead>' +
-        '<tbody>' + rowsHtml + '</tbody>' +
-      '</table>' +
+      '</div>';
+
+    const theadHtml =
+      '<th style="' + thStyle + '">م</th>' +
+      '<th style="' + thStyle + '">التاريخ</th>' +
+      '<th style="' + thStyle + '">من</th>' +
+      '<th style="' + thStyle + '">إلى</th>' +
+      '<th style="' + thStyle + '">المبلغ</th>' +
+      '<th style="' + thStyle + '">الحالة</th>' +
+      '<th style="' + thStyle + '">اعتماد أول</th>' +
+      '<th style="' + thStyle + '">اعتماد ثاني</th>' +
+      '<th style="' + thStyle + '">ملاحظات</th>';
+
+    // total يُحسب هنا بعد اكتمال map فوق، فنبني الفوتر بعد حساب rowsArray
+    const footerHtml =
       '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
       '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
         '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
 
-    document.body.appendChild(container);
-    await new Promise(r => setTimeout(r, 60));
-    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
-    document.body.removeChild(container);
+    return buildPaginatedTablePdf(headerHtml, theadHtml, rowsArray, footerHtml, 18);
+  }
 
-    return canvasToPdfBlob(canvas);
+  async function generateReportPDFBlob() {
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const repName = repInput.value.trim() || (currentUser ? currentUser.name : '—');
+    let total = 0;
+
+    const rowsArray = currentTrips.map((t, i) => {
+      const st = getStatusLabel(t.status);
+      total += Number(t.amount || 0);
+      return '<tr>' +
+        '<td style="' + cellStyle + '">' + (i + 1) + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(repName) + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
+        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + st.text + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + (t.notes ? escapeHtml(t.notes) : '—') + '</td>' +
+      '</tr>';
+    });
+
+    const headerHtml =
+      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '</div>' +
+      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:20px;">' +
+        'تقرير انتقالات يومي عن يوم (' + formatArabicDate(currentDate) + ') محافظة (' + escapeHtml(govInput.value.trim() || '—') + ')' +
+      '</div>';
+
+    const theadHtml =
+      '<th style="' + thStyle + '">م</th>' +
+      '<th style="' + thStyle + '">المندوب</th>' +
+      '<th style="' + thStyle + '">من</th>' +
+      '<th style="' + thStyle + '">إلى</th>' +
+      '<th style="' + thStyle + '">المبلغ</th>' +
+      '<th style="' + thStyle + '">الحالة</th>' +
+      '<th style="' + thStyle + '">اعتماد أول</th>' +
+      '<th style="' + thStyle + '">اعتماد ثاني</th>' +
+      '<th style="' + thStyle + '">ملاحظات</th>';
+
+    const footerHtml =
+      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+        '<div>اسم المندوب: ' + escapeHtml(repName) + '</div>' +
+        '<div>يعتمد: ______________________</div>' +
+      '</div>';
+
+    return buildPaginatedTablePdf(headerHtml, theadHtml, rowsArray, footerHtml, 18);
   }
 
   detailRepPdfBtn.addEventListener('click', async () => {
