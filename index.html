@@ -840,7 +840,7 @@
         '</table>' +
         (isLastPage ? footerHtml : '') +
         (totalPages > 1
-          ? '<div style="text-align:center;font-size:11px;color:#888;margin-top:14px;">صفحة ' + (p + 1) + ' من ' + totalPages + '</div>'
+          ? '<div style="text-align:center;font-size:11px;font-weight:700;color:#000;margin-top:14px;">صفحة ' + (p + 1) + ' من ' + totalPages + '</div>'
           : '');
 
       document.body.appendChild(container);
@@ -855,8 +855,8 @@
 
 
   async function generateAggregatePDFBlob(fromDate, toDate, perRep, grandTotal) {
-    const cellStyle = 'border:1px solid #999;padding:8px;font-size:13px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const cellStyle = 'border:1px solid #999;padding:8px;font-size:14px;font-weight:700;color:#000;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;';
 
     const rowsArray = Object.keys(perRep).map((rep, idx) => {
       return '<tr>' +
@@ -864,18 +864,18 @@
         '<td style="' + cellStyle + '">' + escapeHtml(rep) + '</td>' +
         '<td style="' + cellStyle + '">' + perRep[rep].count + '</td>' +
         '<td style="' + cellStyle + '">' + perRep[rep].rejected + '</td>' +
-        '<td style="' + cellStyle + '">' + perRep[rep].total.toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + perRep[rep].total.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + '</td>' +
         '<td style="' + cellStyle + '">' + (perRep[rep].l2.length ? escapeHtml(perRep[rep].l2.join('، ')) : '—') + '</td>' +
         '<td style="' + cellStyle + '">' + (perRep[rep].l3.length ? escapeHtml(perRep[rep].l3.join('، ')) : '—') + '</td>' +
       '</tr>';
     });
 
     const headerHtml =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#000;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:24px;">' +
+      '<div style="text-align:center;font-size:16px;font-weight:900;color:#000;margin-bottom:24px;">' +
         'تقرير إجمالي الانتقالات من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
       '</div>';
 
@@ -889,8 +889,8 @@
       '<th style="' + thStyle + '">اعتماد نهائي</th>';
 
     const footerHtml =
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي الكلي: ' + grandTotal.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+      '<div style="text-align:left;font-size:18px;font-weight:900;color:#000;margin-bottom:34px;">الإجمالي الكلي: ' + grandTotal.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#000;margin-top:44px;">' +
         '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
@@ -900,8 +900,8 @@
 
   async function generateDetailedRepPDFBlob(repName, fromDate, toDate, rows) {
     const mine = rows.filter(r => (r.rep || r.user) === repName);
-    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:13px;font-weight:700;color:#000;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;';
     let total = 0;
 
     const rowsArray = mine.map((t, i) => {
@@ -912,7 +912,7 @@
         '<td style="' + cellStyle + '">' + escapeHtml(t.date || '') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
-        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + '</td>' +
         '<td style="' + cellStyle + '">' + st.text + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
@@ -921,14 +921,14 @@
     });
 
     const headerHtml =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#000;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:6px;">' +
+      '<div style="text-align:center;font-size:16px;font-weight:900;color:#000;margin-bottom:6px;">' +
         'تقرير تفصيلي — المندوب: ' + escapeHtml(repName) +
       '</div>' +
-      '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:20px;">' +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#000;margin-bottom:20px;">' +
         'من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
       '</div>';
 
@@ -945,8 +945,8 @@
 
     // total يُحسب هنا بعد اكتمال map فوق، فنبني الفوتر بعد حساب rowsArray
     const footerHtml =
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+      '<div style="text-align:left;font-size:18px;font-weight:900;color:#000;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + total.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#000;margin-top:44px;">' +
         '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
@@ -955,8 +955,8 @@
   }
 
   async function generateReportPDFBlob() {
-    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:13px;font-weight:700;color:#000;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;';
     const repName = repInput.value.trim() || (currentUser ? currentUser.name : '—');
     let total = 0;
 
@@ -968,7 +968,7 @@
         '<td style="' + cellStyle + '">' + escapeHtml(repName) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
-        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + '</td>' +
         '<td style="' + cellStyle + '">' + st.text + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
@@ -977,11 +977,11 @@
     });
 
     const headerHtml =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#000;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:20px;">' +
+      '<div style="text-align:center;font-size:16px;font-weight:900;color:#000;margin-bottom:20px;">' +
         'تقرير انتقالات يومي عن يوم (' + formatArabicDate(currentDate) + ') محافظة (' + escapeHtml(govInput.value.trim() || '—') + ')' +
       '</div>';
 
@@ -997,8 +997,8 @@
       '<th style="' + thStyle + '">ملاحظات</th>';
 
     const footerHtml =
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+      '<div style="text-align:left;font-size:18px;font-weight:900;color:#000;margin-bottom:34px;">الإجمالي: ' + total.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#000;margin-top:44px;">' +
         '<div>اسم المندوب: ' + escapeHtml(repName) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
@@ -1027,20 +1027,32 @@
     const statusTitle = statusLabelMap[statusOption] || 'كل الحالات';
     const reps = Array.from(new Set(rows.map(r => r.rep || 'بدون اسم'))).sort();
     const dates = dateRangeArray(fromDate, toDate);
+    const arabicWeekdaysShort = ['حد', 'اتنين', 'تلات', 'اربع', 'خميس', 'جمعة', 'سبت'];
+    function weekdayShort(dateStr) {
+      const dt = new Date(dateStr + 'T00:00:00');
+      return arabicWeekdaysShort[dt.getDay()];
+    }
+    function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 }); }
 
     // matrix[rep][date] = المبلغ
     const matrix = {};
     reps.forEach(rep => { matrix[rep] = {}; dates.forEach(d => { matrix[rep][d] = 0; }); });
+    // أيام التسجيل الفعلية لكل مندوب (لحساب المتوسط الصحيح، مش على كل أيام الفترة)
+    const repActiveDays = {};
+    reps.forEach(rep => { repActiveDays[rep] = new Set(); });
     rows.forEach(r => {
       const rep = r.rep || 'بدون اسم';
       const d = r.date;
       if (!matrix[rep]) { matrix[rep] = {}; dates.forEach(dd => { matrix[rep][dd] = 0; }); }
+      if (!repActiveDays[rep]) repActiveDays[rep] = new Set();
       if (matrix[rep][d] === undefined) matrix[rep][d] = 0;
       matrix[rep][d] += Number(r.amount || 0);
+      if (d) repActiveDays[rep].add(d);
     });
 
-    // إجمالي كل مندوب لكامل الفترة، وإجمالي كل يوم لكل المندوبين، والإجمالي الكلي
+    // إجمالي كل مندوب لكامل الفترة، ومتوسطه اليومي (على أيام تسجيله فعليًا فقط)، وإجمالي كل يوم، والإجمالي الكلي
     const repTotal = {};
+    const repAvg = {};
     const dateTotal = {};
     dates.forEach(d => { dateTotal[d] = 0; });
     let grandTotal = 0;
@@ -1053,15 +1065,18 @@
         grandTotal += v;
       });
       repTotal[rep] = rt;
+      const activeDays = Math.max(1, repActiveDays[rep] ? repActiveDays[rep].size : 0);
+      repAvg[rep] = rt / activeDays;
     });
 
-    const cellStyle = 'border:1px solid #999;padding:5px;font-size:10px;text-align:center;overflow-wrap:break-word;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
-    const totalColStyle = cellStyle + 'background:#f4f4f4;font-weight:700;';
+    const zeroBg = '#FEF08A';
+    const cellStyle = 'border:1px solid #999;padding:5px;font-size:12px;font-weight:700;color:#000;text-align:center;overflow-wrap:break-word;';
+    const thStyle = cellStyle + 'background:#eee;';
+    const totalColStyle = cellStyle + 'background:#f4f4f4;';
     const repCellStyle = cellStyle + 'text-align:right;';
     const repTotalCellStyle = totalColStyle + 'text-align:right;';
 
-    // تقسيم الأيام لمجموعات أعمدة بحيث كل صفحة تحمل عمود التاريخ + إجمالي المندوب مهما كان عدد الأيام
+    // تقسيم الأيام لمجموعات أعمدة بحيث كل صفحة تحمل عمود المندوب + الإجمالي + المتوسط مهما كان عدد الأيام
     const DATE_COLS_PER_PAGE = 10;
     const dateChunks = [];
     for (let i = 0; i < dates.length; i += DATE_COLS_PER_PAGE) {
@@ -1088,49 +1103,54 @@
         const chunkDates = dateChunks[dc];
         const isVeryLastPage = (rc === repChunks.length - 1 && dc === dateChunks.length - 1);
 
-        const repColWidth = 18;
-        const totalColWidth = 10;
-        const dateColWidth = ((100 - repColWidth - totalColWidth) / Math.max(1, chunkDates.length)).toFixed(2);
+        const repColWidth = 16;
+        const totalColWidth = 9;
+        const avgColWidth = 9;
+        const dateColWidth = ((100 - repColWidth - totalColWidth - avgColWidth) / Math.max(1, chunkDates.length)).toFixed(2);
 
         let colgroupHtml = '<colgroup><col style="width:' + repColWidth + '%">';
         chunkDates.forEach(() => { colgroupHtml += '<col style="width:' + dateColWidth + '%">'; });
-        colgroupHtml += '<col style="width:' + totalColWidth + '%"></colgroup>';
+        colgroupHtml += '<col style="width:' + totalColWidth + '%"><col style="width:' + avgColWidth + '%"></colgroup>';
 
         const theadHtml =
           '<th style="' + thStyle + '">المندوب</th>' +
-          chunkDates.map(d => '<th style="' + thStyle + '">' + escapeHtml(d.slice(5)) + '</th>').join('') +
-          '<th style="' + thStyle + '">إجمالي الفترة</th>';
+          chunkDates.map(d => '<th style="' + thStyle + '">' + weekdayShort(d) + '<br><span style="font-size:9px;font-weight:400;">' + d.slice(5) + '</span></th>').join('') +
+          '<th style="' + thStyle + '">إجمالي الفترة</th>' +
+          '<th style="' + thStyle + '">متوسط القيمة اليومي</th>';
 
         const bodyRowsHtml = chunkReps.map(rep => {
           const cells = chunkDates.map(d => {
             const v = matrix[rep][d] || 0;
-            return '<td style="' + cellStyle + '">' + (v ? v.toLocaleString('ar-EG') : '—') + '</td>';
+            const zeroStyle = v === 0 ? ('background:' + zeroBg + ';') : '';
+            return '<td style="' + cellStyle + zeroStyle + '">' + (v ? fmt(v) : '—') + '</td>';
           }).join('');
           return '<tr><td style="' + repCellStyle + '">' + escapeHtml(rep) + '</td>' + cells +
-            '<td style="' + totalColStyle + '">' + repTotal[rep].toLocaleString('ar-EG') + '</td></tr>';
+            '<td style="' + totalColStyle + '">' + fmt(repTotal[rep]) + '</td>' +
+            '<td style="' + totalColStyle + '">' + fmt(repAvg[rep]) + '</td></tr>';
         }).join('');
 
         const totalsRowHtml =
           '<tr>' +
             '<td style="' + repTotalCellStyle + '">إجمالي اليوم</td>' +
-            chunkDates.map(d => '<td style="' + totalColStyle + '">' + dateTotal[d].toLocaleString('ar-EG') + '</td>').join('') +
-            '<td style="' + totalColStyle + '">' + grandTotal.toLocaleString('ar-EG') + '</td>' +
+            chunkDates.map(d => '<td style="' + totalColStyle + '">' + fmt(dateTotal[d]) + '</td>').join('') +
+            '<td style="' + totalColStyle + '">' + fmt(grandTotal) + '</td>' +
+            '<td style="' + totalColStyle + '">—</td>' +
           '</tr>';
 
         const headerHtml =
-          '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:14px;">' +
-            '<div style="font-size:19px;font-weight:900;">شركة كومكس الصناعية</div>' +
-            '<div style="font-size:13px;font-weight:500;margin-top:2px;">(إدارة المبيعات)</div>' +
+          '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;">' +
+            '<div style="font-size:19px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+            '<div style="font-size:13px;font-weight:700;color:#000;margin-top:2px;">(إدارة المبيعات)</div>' +
           '</div>' +
-          '<div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:4px;">' +
+          '<div style="text-align:center;font-size:15px;font-weight:900;color:#000;margin-bottom:4px;">' +
             'تقرير إجمالي المشاوير اليومي لكل مندوب — من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
           '</div>' +
-          '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:14px;">' +
+          '<div style="text-align:center;font-size:12px;font-weight:700;color:#000;margin-bottom:14px;">' +
             'المشاوير المعروضة: ' + statusTitle +
           '</div>';
 
         const footerHtml = isVeryLastPage
-          ? '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:26px;">' +
+          ? '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#000;margin-top:26px;">' +
               '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
               '<div>يعتمد: ______________________</div>' +
             '</div>'
@@ -1144,7 +1164,7 @@
         container.style.background = '#ffffff';
         container.style.fontFamily = "'Tajawal', sans-serif";
         container.setAttribute('dir', 'rtl');
-        container.style.color = '#1a1a1a';
+        container.style.color = '#000000';
         container.style.padding = '28px 34px';
         container.style.boxSizing = 'border-box';
 
@@ -1157,7 +1177,7 @@
           '</table>' +
           footerHtml +
           (totalPages > 1
-            ? '<div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">صفحة ' + pageIndex + ' من ' + totalPages + '</div>'
+            ? '<div style="text-align:center;font-size:10px;font-weight:700;color:#000;margin-top:10px;">صفحة ' + pageIndex + ' من ' + totalPages + '</div>'
             : '');
 
         document.body.appendChild(container);
