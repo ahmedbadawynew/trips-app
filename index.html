@@ -409,6 +409,19 @@
       <button class="primary" id="detail-rep-pdf-btn">تنزيل تقرير المندوب التفصيلي PDF</button>
     </div>
 
+    <div class="field-row">
+      <div>
+        <label>حالة المشاوير في تقرير المصفوفة</label>
+        <select id="matrix-status-filter">
+          <option value="all">الكل</option>
+          <option value="approved">معتمدة (اعتماد نهائي فقط)</option>
+          <option value="pending">غير معتمدة (لسه في الانتظار)</option>
+          <option value="rejected">مرفوضة</option>
+        </select>
+      </div>
+    </div>
+    <button class="add-btn" id="matrix-pdf-btn" style="margin:6px 18px 6px;">تنزيل تقرير مصفوفة (مندوبين × أيام) PDF</button>
+
     <button class="add-btn" id="attendance-btn" style="margin:14px 18px 6px;">حاله تسجيل المندوبين للمشاوير خلال الفتره</button>
     <div id="attendance-results" style="padding:4px 18px 4px;"></div>
   </div>
@@ -502,6 +515,8 @@
   const detailRepSelect = document.getElementById('detail-rep-select');
   const detailRepActions = document.getElementById('detail-rep-actions');
   const detailRepPdfBtn = document.getElementById('detail-rep-pdf-btn');
+  const matrixPdfBtn = document.getElementById('matrix-pdf-btn');
+  const matrixStatusFilter = document.getElementById('matrix-status-filter');
   const attendanceBtn = document.getElementById('attendance-btn');
   const attendanceResults = document.getElementById('attendance-results');
   let lastAggregate = null;
@@ -775,9 +790,10 @@
   // يحوّل مجموعة صفحات (كل صفحة عبارة عن canvas مستقل) إلى ملف PDF — كل صفحة بحجمها الطبيعي
   // من غير أي قص لمنتصف الصفوف. ترقيم الصفحات بيتكتب جوه الصورة نفسها (مش عن طريق jsPDF)
   // عشان jsPDF مبيدعمش رسم النص العربي بشكل صحيح فيطلع مشوّه لو استخدمناه مباشرة.
-  async function canvasesToPdfBlob(canvases) {
+  async function canvasesToPdfBlob(canvases, orientation) {
+    orientation = orientation || 'portrait';
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: orientation, compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
@@ -990,6 +1006,171 @@
     return buildPaginatedTablePdf(headerHtml, theadHtml, rowsArray, footerHtml, 18);
   }
 
+  function dateRangeArray(fromDate, toDate) {
+    const dates = [];
+    let cur = new Date(fromDate + 'T00:00:00');
+    const end = new Date(toDate + 'T00:00:00');
+    while (cur <= end) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const d = String(cur.getDate()).padStart(2, '0');
+      dates.push(y + '-' + m + '-' + d);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+
+  // يبني تقرير مصفوفة (المندوبين أفقيًا × الأيام رأسيًا) بصيغة PDF أفقي (Landscape)
+  // مع إجمالي لكل عمود (مندوب) وإجمالي لكل صف (يوم)، وإجمالي كلي في الزاوية.
+  async function generateMatrixPDFBlob(fromDate, toDate, rows, statusOption) {
+    const statusLabelMap = { all: 'كل الحالات', approved: 'المعتمدة نهائيًا فقط', pending: 'غير المعتمدة فقط', rejected: 'المرفوضة فقط' };
+    const statusTitle = statusLabelMap[statusOption] || 'كل الحالات';
+    const reps = Array.from(new Set(rows.map(r => r.rep || 'بدون اسم'))).sort();
+    const dates = dateRangeArray(fromDate, toDate);
+
+    // matrix[rep][date] = المبلغ
+    const matrix = {};
+    reps.forEach(rep => { matrix[rep] = {}; dates.forEach(d => { matrix[rep][d] = 0; }); });
+    rows.forEach(r => {
+      const rep = r.rep || 'بدون اسم';
+      const d = r.date;
+      if (!matrix[rep]) { matrix[rep] = {}; dates.forEach(dd => { matrix[rep][dd] = 0; }); }
+      if (matrix[rep][d] === undefined) matrix[rep][d] = 0;
+      matrix[rep][d] += Number(r.amount || 0);
+    });
+
+    // إجمالي كل مندوب لكامل الفترة، وإجمالي كل يوم لكل المندوبين، والإجمالي الكلي
+    const repTotal = {};
+    const dateTotal = {};
+    dates.forEach(d => { dateTotal[d] = 0; });
+    let grandTotal = 0;
+    reps.forEach(rep => {
+      let rt = 0;
+      dates.forEach(d => {
+        const v = matrix[rep][d] || 0;
+        rt += v;
+        dateTotal[d] += v;
+        grandTotal += v;
+      });
+      repTotal[rep] = rt;
+    });
+
+    const cellStyle = 'border:1px solid #999;padding:5px;font-size:10px;text-align:center;overflow-wrap:break-word;';
+    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const totalColStyle = cellStyle + 'background:#f4f4f4;font-weight:700;';
+    const repCellStyle = cellStyle + 'text-align:right;';
+    const repTotalCellStyle = totalColStyle + 'text-align:right;';
+
+    // تقسيم الأيام لمجموعات أعمدة بحيث كل صفحة تحمل عمود التاريخ + إجمالي المندوب مهما كان عدد الأيام
+    const DATE_COLS_PER_PAGE = 10;
+    const dateChunks = [];
+    for (let i = 0; i < dates.length; i += DATE_COLS_PER_PAGE) {
+      dateChunks.push(dates.slice(i, i + DATE_COLS_PER_PAGE));
+    }
+    if (dateChunks.length === 0) dateChunks.push([]);
+
+    // تقسيم المندوبين لمجموعات صفوف احتياطًا لو عددهم كبير جدًا (حتى لا يفيض الجدول رأسيًا عن الصفحة)
+    const REPS_PER_PAGE = 20;
+    const repChunks = [];
+    for (let i = 0; i < reps.length; i += REPS_PER_PAGE) {
+      repChunks.push(reps.slice(i, i + REPS_PER_PAGE));
+    }
+    if (repChunks.length === 0) repChunks.push([]);
+
+    const totalPages = dateChunks.length * repChunks.length;
+    const canvases = [];
+    let pageIndex = 0;
+
+    for (let rc = 0; rc < repChunks.length; rc++) {
+      for (let dc = 0; dc < dateChunks.length; dc++) {
+        pageIndex++;
+        const chunkReps = repChunks[rc];
+        const chunkDates = dateChunks[dc];
+        const isVeryLastPage = (rc === repChunks.length - 1 && dc === dateChunks.length - 1);
+
+        const repColWidth = 18;
+        const totalColWidth = 10;
+        const dateColWidth = ((100 - repColWidth - totalColWidth) / Math.max(1, chunkDates.length)).toFixed(2);
+
+        let colgroupHtml = '<colgroup><col style="width:' + repColWidth + '%">';
+        chunkDates.forEach(() => { colgroupHtml += '<col style="width:' + dateColWidth + '%">'; });
+        colgroupHtml += '<col style="width:' + totalColWidth + '%"></colgroup>';
+
+        const theadHtml =
+          '<th style="' + thStyle + '">المندوب</th>' +
+          chunkDates.map(d => '<th style="' + thStyle + '">' + escapeHtml(d.slice(5)) + '</th>').join('') +
+          '<th style="' + thStyle + '">إجمالي الفترة</th>';
+
+        const bodyRowsHtml = chunkReps.map(rep => {
+          const cells = chunkDates.map(d => {
+            const v = matrix[rep][d] || 0;
+            return '<td style="' + cellStyle + '">' + (v ? v.toLocaleString('ar-EG') : '—') + '</td>';
+          }).join('');
+          return '<tr><td style="' + repCellStyle + '">' + escapeHtml(rep) + '</td>' + cells +
+            '<td style="' + totalColStyle + '">' + repTotal[rep].toLocaleString('ar-EG') + '</td></tr>';
+        }).join('');
+
+        const totalsRowHtml =
+          '<tr>' +
+            '<td style="' + repTotalCellStyle + '">إجمالي اليوم</td>' +
+            chunkDates.map(d => '<td style="' + totalColStyle + '">' + dateTotal[d].toLocaleString('ar-EG') + '</td>').join('') +
+            '<td style="' + totalColStyle + '">' + grandTotal.toLocaleString('ar-EG') + '</td>' +
+          '</tr>';
+
+        const headerHtml =
+          '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:14px;">' +
+            '<div style="font-size:19px;font-weight:900;">شركة كومكس الصناعية</div>' +
+            '<div style="font-size:13px;font-weight:500;margin-top:2px;">(إدارة المبيعات)</div>' +
+          '</div>' +
+          '<div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:4px;">' +
+            'تقرير إجمالي المشاوير اليومي لكل مندوب — من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
+          '</div>' +
+          '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:14px;">' +
+            'المشاوير المعروضة: ' + statusTitle +
+          '</div>';
+
+        const footerHtml = isVeryLastPage
+          ? '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:26px;">' +
+              '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
+              '<div>يعتمد: ______________________</div>' +
+            '</div>'
+          : '';
+
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.top = '0';
+        container.style.left = '-99999px';
+        container.style.width = '1100px';
+        container.style.background = '#ffffff';
+        container.style.fontFamily = "'Tajawal', sans-serif";
+        container.setAttribute('dir', 'rtl');
+        container.style.color = '#1a1a1a';
+        container.style.padding = '28px 34px';
+        container.style.boxSizing = 'border-box';
+
+        container.innerHTML =
+          headerHtml +
+          '<table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:16px;">' +
+            colgroupHtml +
+            '<thead><tr>' + theadHtml + '</tr></thead>' +
+            '<tbody>' + bodyRowsHtml + totalsRowHtml + '</tbody>' +
+          '</table>' +
+          footerHtml +
+          (totalPages > 1
+            ? '<div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">صفحة ' + pageIndex + ' من ' + totalPages + '</div>'
+            : '');
+
+        document.body.appendChild(container);
+        await new Promise(r => setTimeout(r, 40));
+        const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+        document.body.removeChild(container);
+        canvases.push(canvas);
+      }
+    }
+
+    return canvasesToPdfBlob(canvases, 'landscape');
+  }
+
   detailRepPdfBtn.addEventListener('click', async () => {
     const repName = detailRepSelect.value;
     if (!repName || !lastAggregate) { showToast('اعرض المشاوير الأول'); return; }
@@ -999,6 +1180,32 @@
       const blob = await generateDetailedRepPDFBlob(repName, lastAggregate.fromDate, lastAggregate.toDate, lastEntries);
       downloadBlob(blob, 'تقرير-تفصيلي-' + repName.replace(/\s+/g, '_') + '-' + lastAggregate.fromDate + '_' + lastAggregate.toDate + '.pdf');
       showToast('تم تنزيل التقرير التفصيلي');
+    } catch (e) {
+      showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  function filterByStatusOption(rows, option) {
+    if (option === 'approved') return rows.filter(r => r.status === 'approved_l3');
+    if (option === 'pending') return rows.filter(r => r.status !== 'approved_l3' && r.status !== 'rejected');
+    if (option === 'rejected') return rows.filter(r => r.status === 'rejected');
+    return rows; // all
+  }
+
+  matrixPdfBtn.addEventListener('click', async () => {
+    if (!lastAggregate || !lastEntries || lastEntries.length === 0) { showToast('اعرض المشاوير الأول'); return; }
+    const statusOption = matrixStatusFilter.value;
+    const filtered = filterByStatusOption(lastEntries, statusOption);
+    if (filtered.length === 0) { showToast('مفيش مشاوير بالحالة المختارة في هذه الفترة'); return; }
+    setBusy(true);
+    showToast('جاري إعداد تقرير المصفوفة...');
+    try {
+      const blob = await generateMatrixPDFBlob(lastAggregate.fromDate, lastAggregate.toDate, filtered, statusOption);
+      const statusSuffix = { all: 'الكل', approved: 'معتمدة', pending: 'غير-معتمدة', rejected: 'مرفوضة' }[statusOption] || 'الكل';
+      downloadBlob(blob, 'تقرير-مصفوفة-' + statusSuffix + '-' + lastAggregate.fromDate + '_' + lastAggregate.toDate + '.pdf');
+      showToast('تم تنزيل تقرير المصفوفة');
     } catch (e) {
       showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
     } finally {
@@ -1350,7 +1557,7 @@
     return '<div class="kpi-card"><div class="kpi-label">' + label + '</div><div class="kpi-value">' + value + '</div></div>';
   }
 
-  function renderAdminDashboard(rows) {
+  function renderAdminDashboard(rows, fromDate, toDate) {
     const totalTrips = rows.length;
     const totalAmount = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
     const rejectedCount = rows.filter(r => String(r.status || '').trim().toLowerCase() === 'rejected').length;
@@ -1358,12 +1565,18 @@
     rows.forEach(r => { repsSet[r.rep || r.user || 'بدون اسم'] = true; });
     const repsCount = Object.keys(repsSet).length;
 
+    const numDays = Math.max(1, dateRangeArray(fromDate || todayISO(), toDate || todayISO()).length);
+    const avgPerDayAllReps = totalAmount / numDays;
+    const avgPerDayPerRep = totalAmount / (Math.max(1, repsCount) * numDays);
+
     let html = '<div class="list-title">نظرة عامة</div>';
     html += '<div class="kpi-grid">' +
       kpiCard('عدد المشاوير', totalTrips) +
       kpiCard('الإجمالي', totalAmount.toLocaleString('ar-EG') + ' ج.م') +
       kpiCard('عدد المرفوض', rejectedCount) +
       kpiCard('عدد المندوبين', repsCount) +
+      kpiCard('متوسط اليوم لكل المندوبين', avgPerDayAllReps.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م') +
+      kpiCard('متوسط اليوم للمندوب الواحد', avgPerDayPerRep.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م') +
     '</div>';
 
     const perRepAmount = {};
@@ -1374,6 +1587,14 @@
     const repsSorted = Object.keys(perRepAmount).sort((a, b) => perRepAmount[b] - perRepAmount[a]);
     const maxVal = Math.max(1, ...Object.values(perRepAmount));
 
+    // عدد الأيام الفعلية اللي كل مندوب سجّل فيها مشوار على الأقل (مش كل أيام الفترة)
+    const repActiveDays = {};
+    rows.forEach(r => {
+      const rep = r.rep || r.user || 'بدون اسم';
+      if (!repActiveDays[rep]) repActiveDays[rep] = new Set();
+      if (r.date) repActiveDays[rep].add(r.date);
+    });
+
     if (repsSorted.length > 0) {
       html += '<div class="list-title" style="margin-top:14px;">توزيع المبالغ حسب المندوب</div>';
       repsSorted.forEach(rep => {
@@ -1383,6 +1604,17 @@
           '<div style="background:var(--rule);border-radius:6px;overflow:hidden;height:10px;">' +
             '<div style="background:var(--accent);height:100%;width:' + pct + '%;"></div>' +
           '</div>' +
+        '</div>';
+      });
+
+      html += '<div class="list-title" style="margin-top:14px;">متوسط قيمة المندوب اليومي (الإجمالي ÷ عدد أيام تسجيله الفعلية)</div>';
+      repsSorted.forEach(rep => {
+        const activeDaysCount = Math.max(1, (repActiveDays[rep] ? repActiveDays[rep].size : 0));
+        const avg = perRepAmount[rep] / activeDaysCount;
+        html += '<div class="trip-row">' +
+          '<div class="trip-main"><div class="trip-route">' + escapeHtml(rep) + '</div>' +
+          '<div class="trip-notes">' + activeDaysCount + ' يوم تسجيل فعلي</div></div>' +
+          '<div class="trip-amount">' + avg.toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م / يوم</div>' +
         '</div>';
       });
     }
@@ -1468,7 +1700,7 @@
     lastAggregate = { fromDate: fromDate, toDate: toDate, perRep: perRep, grandTotal: grandTotal };
 
     if (currentUser.role === 'admin') {
-      renderAdminDashboard(rows);
+      renderAdminDashboard(rows, fromDate, toDate);
     } else {
       const mine = myScopeTrips(rows);
       if (mine.length === 0) {
