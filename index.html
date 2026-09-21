@@ -304,11 +304,6 @@
     <div id="pw-msg" style="text-align:center; font-size:13px; min-height:16px; padding:4px 0;"></div>
   </div>
 
-  <div id="rep-tabs" style="display:none; gap:8px; margin-bottom:12px;">
-    <button id="tab-trips-btn" class="add-btn" style="flex:1; margin:0;">المشاوير</button>
-    <button id="tab-orders-btn" class="add-btn" style="flex:1; margin:0; background:#fff; color:var(--accent-dark); border:1px solid var(--accent);">الطلبيات</button>
-  </div>
-
   <div class="receipt" id="rep-card">
     <div class="head">
       <h1>سجل الانتقالات اليومية</h1>
@@ -380,80 +375,6 @@
     <div class="toast" id="toast"></div>
   </div>
 
-  <div class="receipt" id="orders-card" style="display:none;">
-    <div class="head">
-      <h1>سجل الطلبيات اليومية</h1>
-      <p id="order-date-display"></p>
-    </div>
-
-    <div class="field-row">
-      <div>
-        <label>التاريخ</label>
-        <input type="date" id="order-date-input">
-      </div>
-      <div>
-        <label>المحافظة</label>
-        <input type="text" id="order-gov-input" placeholder="مثال: القاهرة">
-      </div>
-    </div>
-
-    <div class="field-row">
-      <div>
-        <label>المركز</label>
-        <input type="text" id="order-center-input" placeholder="مثال: مركز كذا">
-      </div>
-    </div>
-
-    <div class="field-row">
-      <div class="two-col">
-        <div>
-          <label>العميل</label>
-          <input type="text" id="order-customer-input" placeholder="اسم العميل">
-        </div>
-        <div>
-          <label>الصنف</label>
-          <input type="text" id="order-item-input" placeholder="اسم الصنف/المنتج">
-        </div>
-      </div>
-      <div>
-        <label>القيمة (جنيه)</label>
-        <input type="number" id="order-value-input" placeholder="0" inputmode="decimal">
-      </div>
-    </div>
-
-    <button class="add-btn" id="add-order-btn">+ إضافة طلبية</button>
-
-    <div class="list">
-      <div class="list-title">طلبيات اليوم</div>
-      <div id="order-list"></div>
-      <div id="order-empty-msg" class="empty">لسه مفيش طلبيات مسجلة</div>
-    </div>
-
-    <div class="total-bar">
-      <span class="label">إجمالي الطلبيات</span>
-      <span class="value" id="order-total-value">0 ج.م</span>
-    </div>
-
-    <button class="add-btn" id="save-orders-btn" style="margin:12px 18px 4px;">✔ حفظ الطلبيات</button>
-
-    <div class="list-title" style="margin-top:20px; border-top:2px dashed var(--rule); padding-top:16px;">تقرير عملائي وأصنافهم</div>
-    <div class="field-row">
-      <div class="two-col">
-        <div>
-          <label>من تاريخ</label>
-          <input type="date" id="order-report-from">
-        </div>
-        <div>
-          <label>إلى تاريخ</label>
-          <input type="date" id="order-report-to">
-        </div>
-      </div>
-    </div>
-    <button class="add-btn" id="order-customer-report-btn" style="margin:6px 18px 6px;">عرض عملائي وأصنافهم</button>
-    <div id="order-customer-report-results" style="padding:4px 18px 16px;"></div>
-    <div class="toast" id="order-toast"></div>
-  </div>
-
   <div class="receipt" id="admin-panel" style="display:none; margin-top:12px;">
     <div class="head">
       <h1 id="admin-panel-title">لوحة الاعتماد</h1>
@@ -503,10 +424,6 @@
 
     <button class="add-btn" id="attendance-btn" style="margin:14px 18px 6px;">حاله تسجيل المندوبين للمشاوير خلال الفتره</button>
     <div id="attendance-results" style="padding:4px 18px 4px;"></div>
-
-    <div class="list-title" style="margin-top:20px; border-top:2px dashed var(--rule); padding-top:16px;">تقرير الطلبيات (بنفس الفترة المختارة فوق)</div>
-    <button class="add-btn" id="orders-report-btn" style="margin:6px 18px 6px;">عرض الطلبيات</button>
-    <div id="orders-report-results" style="padding:4px 18px 16px;"></div>
   </div>
 </div>
 
@@ -602,32 +519,6 @@
   const matrixStatusFilter = document.getElementById('matrix-status-filter');
   const attendanceBtn = document.getElementById('attendance-btn');
   const attendanceResults = document.getElementById('attendance-results');
-
-  const repTabs = document.getElementById('rep-tabs');
-  const tabTripsBtn = document.getElementById('tab-trips-btn');
-  const tabOrdersBtn = document.getElementById('tab-orders-btn');
-  const ordersCard = document.getElementById('orders-card');
-  const orderDateInput = document.getElementById('order-date-input');
-  const orderDateDisplay = document.getElementById('order-date-display');
-  const orderGovInput = document.getElementById('order-gov-input');
-  const orderCenterInput = document.getElementById('order-center-input');
-  const orderCustomerInput = document.getElementById('order-customer-input');
-  const orderItemInput = document.getElementById('order-item-input');
-  const orderValueInput = document.getElementById('order-value-input');
-  const addOrderBtn = document.getElementById('add-order-btn');
-  const orderListEl = document.getElementById('order-list');
-  const orderEmptyMsg = document.getElementById('order-empty-msg');
-  const orderTotalValue = document.getElementById('order-total-value');
-  const saveOrdersBtn = document.getElementById('save-orders-btn');
-  const orderReportFrom = document.getElementById('order-report-from');
-  const orderReportTo = document.getElementById('order-report-to');
-  const orderCustomerReportBtn = document.getElementById('order-customer-report-btn');
-  const orderCustomerReportResults = document.getElementById('order-customer-report-results');
-  const orderToast = document.getElementById('order-toast');
-  const ordersReportBtn = document.getElementById('orders-report-btn');
-  const ordersReportResults = document.getElementById('orders-report-results');
-  let currentOrders = [];
-  let currentOrderDate = todayISO();
   let lastAggregate = null;
   let currentActionableByRep = {};
   
@@ -768,8 +659,6 @@
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-
-  function fmtPlain(n) { return String(Math.round(Number(n) || 0)); }
 
   function apiUrl(params) {
     const p = new URLSearchParams(params);
@@ -1952,19 +1841,11 @@
 
   function applyRoleUI() {
     if (currentUser.role === 'rep') {
-      repTabs.style.display = 'flex';
       repCard.style.display = '';
-      ordersCard.style.display = 'none';
       adminPanel.style.display = 'none';
       userLabel.textContent = 'المندوب: ' + currentUser.name;
-      orderDateInput.value = currentOrderDate;
-      orderDateDisplay.textContent = formatArabicDate(currentOrderDate);
-      orderReportFrom.value = currentOrderDate;
-      orderReportTo.value = currentOrderDate;
     } else {
-      repTabs.style.display = 'none';
       repCard.style.display = 'none';
-      ordersCard.style.display = 'none';
       adminPanel.style.display = '';
       if (currentUser.role === 'level2') {
         adminPanelTitle.textContent = 'لوحة اعتماد — مستوى 1';
@@ -1982,25 +1863,6 @@
       reportBtn.click();
     }
   }
-
-  tabTripsBtn.addEventListener('click', () => {
-    repCard.style.display = '';
-    ordersCard.style.display = 'none';
-    tabTripsBtn.style.background = '';
-    tabTripsBtn.style.color = '';
-    tabOrdersBtn.style.background = '#fff';
-    tabOrdersBtn.style.color = 'var(--accent-dark)';
-  });
-
-  tabOrdersBtn.addEventListener('click', () => {
-    ordersCard.style.display = '';
-    repCard.style.display = 'none';
-    tabOrdersBtn.style.background = '';
-    tabOrdersBtn.style.color = '';
-    tabTripsBtn.style.background = '#fff';
-    tabTripsBtn.style.color = 'var(--accent-dark)';
-    loadOrders(currentOrderDate);
-  });
 
   changePwBtn.addEventListener('click', () => {
     const showing = changePwPanel.style.display !== 'none';
@@ -2104,226 +1966,6 @@
     loginUsername.value = '';
     loginPassword.value = '';
     loginError.textContent = '';
-  });
-
-  function renderOrders() {
-    orderListEl.innerHTML = '';
-    if (currentOrders.length === 0) {
-      orderEmptyMsg.style.display = 'block';
-    } else {
-      orderEmptyMsg.style.display = 'none';
-      currentOrders.forEach((o, i) => {
-        const row = document.createElement('div');
-        row.className = 'trip-row';
-        const actionHtml = o.sent
-          ? '<span class="trip-sent">✓</span>'
-          : '<button class="trip-del" data-i="' + i + '">✕</button>';
-        row.innerHTML =
-          '<div class="trip-main">' +
-            '<div class="trip-route">' + escapeHtml(o.customer) + ' — ' + escapeHtml(o.item) + '</div>' +
-            '<div class="trip-notes">' + escapeHtml(o.gov || '—') + ' / ' + escapeHtml(o.center || '—') + '</div>' +
-          '</div>' +
-          '<div class="trip-amount">' + fmtPlain(o.value) + '</div>' +
-          actionHtml;
-        orderListEl.appendChild(row);
-      });
-      orderListEl.querySelectorAll('.trip-del').forEach(btn => {
-        btn.addEventListener('click', () => {
-          currentOrders.splice(Number(btn.getAttribute('data-i')), 1);
-          renderOrders();
-        });
-      });
-    }
-    const total = currentOrders.reduce((s, o) => s + Number(o.value || 0), 0);
-    orderTotalValue.textContent = fmtPlain(total) + ' ج.م';
-  }
-
-  function showOrderToast(msg) {
-    orderToast.textContent = msg;
-    setTimeout(() => { if (orderToast.textContent === msg) orderToast.textContent = ''; }, 6000);
-  }
-
-  async function loadOrders(dateIso) {
-    if (!currentUser) { currentOrders = []; renderOrders(); return; }
-    try {
-      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: dateIso, to: dateIso }));
-      currentOrders = (Array.isArray(data) ? data : []).map(o => ({
-        gov: o.gov, center: o.center, customer: o.customer, item: o.item, value: o.value, sent: true
-      }));
-    } catch (e) {
-      currentOrders = [];
-      showOrderToast('تعذر تحميل الطلبيات: ' + (e && e.message ? e.message : String(e)));
-    }
-    renderOrders();
-  }
-
-  async function trySendOrder(order) {
-    try {
-      const url = apiUrl({
-        action: 'add_order',
-        date: currentOrderDate,
-        gov: order.gov || '',
-        center: order.center || '',
-        customer: order.customer,
-        item: order.item,
-        value: order.value,
-        client_id: order.clientId || ''
-      });
-      const data = await jsonpRequest(url);
-      if (data && data.status === 'ok') {
-        order.sent = true;
-        renderOrders();
-        return true;
-      }
-      showOrderToast((data && data.message) ? data.message : 'رد غير متوقع من السيرفر');
-      return false;
-    } catch (e) {
-      showOrderToast('خطأ: ' + (e && e.message ? e.message : String(e)));
-      return false;
-    }
-  }
-
-  orderDateInput.addEventListener('change', () => {
-    currentOrderDate = orderDateInput.value || todayISO();
-    orderDateDisplay.textContent = formatArabicDate(currentOrderDate);
-    loadOrders(currentOrderDate);
-  });
-
-  addOrderBtn.addEventListener('click', () => {
-    const gov = orderGovInput.value.trim();
-    const center = orderCenterInput.value.trim();
-    const customer = orderCustomerInput.value.trim();
-    const item = orderItemInput.value.trim();
-    const value = parseFloat(orderValueInput.value);
-    if (!customer || !item || !value || value <= 0) {
-      showOrderToast('اكتب العميل والصنف والقيمة الأول');
-      return;
-    }
-    currentOrders.push({
-      gov, center, customer, item, value, sent: false,
-      clientId: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2)
-    });
-    renderOrders();
-    orderCustomerInput.value = '';
-    orderItemInput.value = '';
-    orderValueInput.value = '';
-    showOrderToast('اتضافت محليًا — دوس "حفظ الطلبيات" عشان تتسجل فعليًا');
-  });
-
-  let isSavingOrders = false;
-  saveOrdersBtn.addEventListener('click', async () => {
-    if (isSavingOrders) return;
-    const unsent = currentOrders.filter(o => !o.sent);
-    if (unsent.length === 0) { showOrderToast('كل الطلبيات متسجلة بالفعل'); return; }
-    isSavingOrders = true;
-    setBusy(true);
-    showOrderToast('جاري حفظ الطلبيات...');
-    let okCount = 0;
-    for (const o of unsent) {
-      if (o.sent) { okCount++; continue; }
-      const ok = await trySendOrder(o);
-      if (ok) okCount++;
-    }
-    if (okCount === unsent.length) {
-      showOrderToast('تم حفظ الطلبيات');
-    }
-    isSavingOrders = false;
-    setBusy(false);
-  });
-
-  orderCustomerReportBtn.addEventListener('click', async () => {
-    const fromDate = orderReportFrom.value || currentOrderDate;
-    const toDate = orderReportTo.value || currentOrderDate;
-    setBusy(true);
-    orderCustomerReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">جاري التحميل...</div>';
-    try {
-      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: fromDate, to: toDate }));
-      const rows = Array.isArray(data) ? data : [];
-      if (rows.length === 0) {
-        orderCustomerReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">مفيش طلبيات في الفترة دي</div>';
-        return;
-      }
-      const byCustomer = {};
-      rows.forEach(o => {
-        const c = o.customer || 'بدون اسم';
-        if (!byCustomer[c]) byCustomer[c] = { total: 0, items: {} };
-        byCustomer[c].total += Number(o.value || 0);
-        const it = o.item || 'غير محدد';
-        byCustomer[c].items[it] = (byCustomer[c].items[it] || 0) + Number(o.value || 0);
-      });
-      let html = '';
-      Object.keys(byCustomer).sort((a, b) => byCustomer[b].total - byCustomer[a].total).forEach(c => {
-        const itemsList = Object.keys(byCustomer[c].items)
-          .sort((a, b) => byCustomer[c].items[b] - byCustomer[c].items[a])
-          .map(it => escapeHtml(it) + ' (' + fmtPlain(byCustomer[c].items[it]) + ')').join('، ');
-        html += '<div class="trip-row" style="display:block;">' +
-          '<div style="display:flex;justify-content:space-between;"><strong>' + escapeHtml(c) + '</strong><span>' + fmtPlain(byCustomer[c].total) + ' ج.م</span></div>' +
-          '<div class="trip-notes" style="margin-top:4px;">الأصناف: ' + itemsList + '</div>' +
-        '</div>';
-      });
-      orderCustomerReportResults.innerHTML = html;
-    } catch (e) {
-      orderCustomerReportResults.innerHTML = '<div style="color:var(--danger);text-align:center;font-size:13px;padding:8px 0;">خطأ: ' + (e && e.message ? e.message : String(e)) + '</div>';
-    } finally {
-      setBusy(false);
-    }
-  });
-
-  ordersReportBtn.addEventListener('click', async () => {
-    const fromDate = reportFrom.value || todayISO();
-    const toDate = reportTo.value || todayISO();
-    setBusy(true);
-    ordersReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">جاري التحميل...</div>';
-    try {
-      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: fromDate, to: toDate }));
-      const rows = Array.isArray(data) ? data : [];
-      if (rows.length === 0) {
-        ordersReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">مفيش طلبيات في الفترة دي</div>';
-        return;
-      }
-      const totalValue = rows.reduce((s, o) => s + Number(o.value || 0), 0);
-      const uniqueCustomers = new Set(rows.map(o => o.customer)).size;
-      const uniqueItems = new Set(rows.map(o => o.item)).size;
-
-      let html = '<div class="kpi-grid">' +
-        kpiCard('عدد الطلبيات', rows.length) +
-        kpiCard('إجمالي القيمة', fmtPlain(totalValue) + ' ج.م') +
-        kpiCard('عدد العملاء', uniqueCustomers) +
-        kpiCard('عدد الأصناف', uniqueItems) +
-      '</div>';
-
-      const byCustomer = {};
-      rows.forEach(o => { const c = o.customer || 'بدون اسم'; byCustomer[c] = (byCustomer[c] || 0) + Number(o.value || 0); });
-      const topCustomers = Object.keys(byCustomer).sort((a, b) => byCustomer[b] - byCustomer[a]).slice(0, 10);
-      html += '<div class="list-title">أكتر 10 عملاء</div>';
-      topCustomers.forEach(c => {
-        html += '<div class="trip-row"><div class="trip-main"><div class="trip-route">' + escapeHtml(c) + '</div></div><div class="trip-amount">' + fmtPlain(byCustomer[c]) + '</div></div>';
-      });
-
-      const byItem = {};
-      rows.forEach(o => { const it = o.item || 'غير محدد'; byItem[it] = (byItem[it] || 0) + Number(o.value || 0); });
-      const topItems = Object.keys(byItem).sort((a, b) => byItem[b] - byItem[a]).slice(0, 10);
-      html += '<div class="list-title">أكتر 10 أصناف</div>';
-      topItems.forEach(it => {
-        html += '<div class="trip-row"><div class="trip-main"><div class="trip-route">' + escapeHtml(it) + '</div></div><div class="trip-amount">' + fmtPlain(byItem[it]) + '</div></div>';
-      });
-
-      const byRep = {};
-      rows.forEach(o => { const r = o.rep || 'بدون اسم'; byRep[r] = (byRep[r] || 0) + Number(o.value || 0); });
-      const repsSorted = Object.keys(byRep).sort((a, b) => byRep[b] - byRep[a]);
-      if (repsSorted.length > 1) {
-        html += '<div class="list-title">إجمالي كل مندوب</div>';
-        repsSorted.forEach(r => {
-          html += '<div class="trip-row"><div class="trip-main"><div class="trip-route">' + escapeHtml(r) + '</div></div><div class="trip-amount">' + fmtPlain(byRep[r]) + '</div></div>';
-        });
-      }
-
-      ordersReportResults.innerHTML = html;
-    } catch (e) {
-      ordersReportResults.innerHTML = '<div style="color:var(--danger);text-align:center;font-size:13px;padding:8px 0;">خطأ: ' + (e && e.message ? e.message : String(e)) + '</div>';
-    } finally {
-      setBusy(false);
-    }
   });
 
   (function restoreSession() {
