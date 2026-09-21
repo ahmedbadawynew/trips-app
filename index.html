@@ -304,6 +304,11 @@
     <div id="pw-msg" style="text-align:center; font-size:13px; min-height:16px; padding:4px 0;"></div>
   </div>
 
+  <div id="rep-tabs" style="display:none; gap:8px; margin-bottom:12px;">
+    <button id="tab-trips-btn" class="add-btn" style="flex:1; margin:0;">المشاوير</button>
+    <button id="tab-orders-btn" class="add-btn" style="flex:1; margin:0; background:#fff; color:var(--accent-dark); border:1px solid var(--accent);">الطلبيات</button>
+  </div>
+
   <div class="receipt" id="rep-card">
     <div class="head">
       <h1>سجل الانتقالات اليومية</h1>
@@ -375,6 +380,80 @@
     <div class="toast" id="toast"></div>
   </div>
 
+  <div class="receipt" id="orders-card" style="display:none;">
+    <div class="head">
+      <h1>سجل الطلبيات اليومية</h1>
+      <p id="order-date-display"></p>
+    </div>
+
+    <div class="field-row">
+      <div>
+        <label>التاريخ</label>
+        <input type="date" id="order-date-input">
+      </div>
+      <div>
+        <label>المحافظة</label>
+        <input type="text" id="order-gov-input" placeholder="مثال: القاهرة">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div>
+        <label>المركز</label>
+        <input type="text" id="order-center-input" placeholder="مثال: مركز كذا">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="two-col">
+        <div>
+          <label>العميل</label>
+          <input type="text" id="order-customer-input" placeholder="اسم العميل">
+        </div>
+        <div>
+          <label>الصنف</label>
+          <input type="text" id="order-item-input" placeholder="اسم الصنف/المنتج">
+        </div>
+      </div>
+      <div>
+        <label>القيمة (جنيه)</label>
+        <input type="number" id="order-value-input" placeholder="0" inputmode="decimal">
+      </div>
+    </div>
+
+    <button class="add-btn" id="add-order-btn">+ إضافة طلبية</button>
+
+    <div class="list">
+      <div class="list-title">طلبيات اليوم</div>
+      <div id="order-list"></div>
+      <div id="order-empty-msg" class="empty">لسه مفيش طلبيات مسجلة</div>
+    </div>
+
+    <div class="total-bar">
+      <span class="label">إجمالي الطلبيات</span>
+      <span class="value" id="order-total-value">0 ج.م</span>
+    </div>
+
+    <button class="add-btn" id="save-orders-btn" style="margin:12px 18px 4px;">✔ حفظ الطلبيات</button>
+
+    <div class="list-title" style="margin-top:20px; border-top:2px dashed var(--rule); padding-top:16px;">تقرير عملائي وأصنافهم</div>
+    <div class="field-row">
+      <div class="two-col">
+        <div>
+          <label>من تاريخ</label>
+          <input type="date" id="order-report-from">
+        </div>
+        <div>
+          <label>إلى تاريخ</label>
+          <input type="date" id="order-report-to">
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" id="order-customer-report-btn" style="margin:6px 18px 6px;">عرض عملائي وأصنافهم</button>
+    <div id="order-customer-report-results" style="padding:4px 18px 16px;"></div>
+    <div class="toast" id="order-toast"></div>
+  </div>
+
   <div class="receipt" id="admin-panel" style="display:none; margin-top:12px;">
     <div class="head">
       <h1 id="admin-panel-title">لوحة الاعتماد</h1>
@@ -424,6 +503,10 @@
 
     <button class="add-btn" id="attendance-btn" style="margin:14px 18px 6px;">حاله تسجيل المندوبين للمشاوير خلال الفتره</button>
     <div id="attendance-results" style="padding:4px 18px 4px;"></div>
+
+    <div class="list-title" style="margin-top:20px; border-top:2px dashed var(--rule); padding-top:16px;">تقرير الطلبيات (بنفس الفترة المختارة فوق)</div>
+    <button class="add-btn" id="orders-report-btn" style="margin:6px 18px 6px;">عرض الطلبيات</button>
+    <div id="orders-report-results" style="padding:4px 18px 16px;"></div>
   </div>
 </div>
 
@@ -519,6 +602,32 @@
   const matrixStatusFilter = document.getElementById('matrix-status-filter');
   const attendanceBtn = document.getElementById('attendance-btn');
   const attendanceResults = document.getElementById('attendance-results');
+
+  const repTabs = document.getElementById('rep-tabs');
+  const tabTripsBtn = document.getElementById('tab-trips-btn');
+  const tabOrdersBtn = document.getElementById('tab-orders-btn');
+  const ordersCard = document.getElementById('orders-card');
+  const orderDateInput = document.getElementById('order-date-input');
+  const orderDateDisplay = document.getElementById('order-date-display');
+  const orderGovInput = document.getElementById('order-gov-input');
+  const orderCenterInput = document.getElementById('order-center-input');
+  const orderCustomerInput = document.getElementById('order-customer-input');
+  const orderItemInput = document.getElementById('order-item-input');
+  const orderValueInput = document.getElementById('order-value-input');
+  const addOrderBtn = document.getElementById('add-order-btn');
+  const orderListEl = document.getElementById('order-list');
+  const orderEmptyMsg = document.getElementById('order-empty-msg');
+  const orderTotalValue = document.getElementById('order-total-value');
+  const saveOrdersBtn = document.getElementById('save-orders-btn');
+  const orderReportFrom = document.getElementById('order-report-from');
+  const orderReportTo = document.getElementById('order-report-to');
+  const orderCustomerReportBtn = document.getElementById('order-customer-report-btn');
+  const orderCustomerReportResults = document.getElementById('order-customer-report-results');
+  const orderToast = document.getElementById('order-toast');
+  const ordersReportBtn = document.getElementById('orders-report-btn');
+  const ordersReportResults = document.getElementById('orders-report-results');
+  let currentOrders = [];
+  let currentOrderDate = todayISO();
   let lastAggregate = null;
   let currentActionableByRep = {};
   
@@ -621,10 +730,16 @@
         const actionHtml = t.sent
           ? '<span class="trip-sent" title="مسجل في قاعدة البيانات">✓</span>'
           : '<button class="trip-del" data-i="' + i + '">✕</button>';
-        
+
         let badgesHtml = '<span class="badge ' + st.class + '">' + st.text + '</span>';
+        let editedNoteHtml = '';
         if (isEdited) {
-          badgesHtml += ' <span class="badge badge-edited-tag">تم التعديل</span>';
+          badgesHtml += ' <span class="badge badge-edited-tag">تم تعديل المبلغ</span>';
+          const origAmount = Number(t.original_amount || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 });
+          const editorName = t.edited_by ? escapeHtml(t.edited_by) : 'جهة الاعتماد';
+          editedNoteHtml = '<div style="font-size:11.5px;color:#854D0E;background:#FEF9E7;border-radius:6px;padding:4px 8px;margin-top:4px;">' +
+            'المبلغ الأصلي كان ' + origAmount + ' ج.م، وتم تعديله بواسطة ' + editorName +
+          '</div>';
         }
 
         row.innerHTML =
@@ -632,6 +747,7 @@
             '<div class="trip-route">' + escapeHtml(t.from) + '<span class="arrow">←</span>' + escapeHtml(t.to) + '</div>' +
             notesHtml +
             '<div>' + badgesHtml + '</div>' +
+            editedNoteHtml +
           '</div>' +
           '<div class="trip-amount">' + Number(t.amount).toLocaleString('ar-EG') + ' ج.م</div>' +
           actionHtml;
@@ -652,6 +768,8 @@
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+
+  function fmtPlain(n) { return String(Math.round(Number(n) || 0)); }
 
   function apiUrl(params) {
     const p = new URLSearchParams(params);
@@ -691,6 +809,8 @@
         notes: t.notes,
         status: t.status,
         edited: t.edited || t.is_edited,
+        original_amount: t.original_amount,
+        edited_by: t.edited_by,
         approver_l2: t.approver_l2,
         approver_l3: t.approver_l3,
         sent: true
@@ -794,11 +914,11 @@
     orientation = orientation || 'portrait';
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: orientation, compress: true });
-    const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
 
     canvases.forEach((canvas, idx) => {
-      if (idx > 0) pdf.addPage();
+      if (idx > 0) pdf.addPage('a4', orientation);
+      const pageWidth = pdf.internal.pageSize.getWidth();
       const imgWidth = pageWidth - margin * 2;
       const imgHeight = canvas.height * (imgWidth / canvas.width);
       const imgData = canvas.toDataURL('image/jpeg', 0.85);
@@ -840,7 +960,7 @@
         '</table>' +
         (isLastPage ? footerHtml : '') +
         (totalPages > 1
-          ? '<div style="text-align:center;font-size:11px;color:#888;margin-top:14px;">صفحة ' + (p + 1) + ' من ' + totalPages + '</div>'
+          ? '<div style="text-align:center;font-size:11px;font-weight:700;color:#000;margin-top:14px;">صفحة ' + (p + 1) + ' من ' + totalPages + '</div>'
           : '');
 
       document.body.appendChild(container);
@@ -855,8 +975,8 @@
 
 
   async function generateAggregatePDFBlob(fromDate, toDate, perRep, grandTotal) {
-    const cellStyle = 'border:1px solid #999;padding:8px;font-size:13px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const cellStyle = 'border:1px solid #999;padding:8px;font-size:14px;font-weight:700;color:#000;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;';
 
     const rowsArray = Object.keys(perRep).map((rep, idx) => {
       return '<tr>' +
@@ -864,18 +984,18 @@
         '<td style="' + cellStyle + '">' + escapeHtml(rep) + '</td>' +
         '<td style="' + cellStyle + '">' + perRep[rep].count + '</td>' +
         '<td style="' + cellStyle + '">' + perRep[rep].rejected + '</td>' +
-        '<td style="' + cellStyle + '">' + perRep[rep].total.toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + String(Math.round(perRep[rep].total)) + '</td>' +
         '<td style="' + cellStyle + '">' + (perRep[rep].l2.length ? escapeHtml(perRep[rep].l2.join('، ')) : '—') + '</td>' +
         '<td style="' + cellStyle + '">' + (perRep[rep].l3.length ? escapeHtml(perRep[rep].l3.join('، ')) : '—') + '</td>' +
       '</tr>';
     });
 
     const headerHtml =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#000;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:24px;">' +
+      '<div style="text-align:center;font-size:16px;font-weight:900;color:#000;margin-bottom:24px;">' +
         'تقرير إجمالي الانتقالات من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
       '</div>';
 
@@ -889,8 +1009,8 @@
       '<th style="' + thStyle + '">اعتماد نهائي</th>';
 
     const footerHtml =
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي الكلي: ' + grandTotal.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+      '<div style="text-align:left;font-size:18px;font-weight:900;color:#000;margin-bottom:34px;">الإجمالي الكلي: ' + String(Math.round(grandTotal)) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#000;margin-top:44px;">' +
         '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
@@ -900,8 +1020,8 @@
 
   async function generateDetailedRepPDFBlob(repName, fromDate, toDate, rows) {
     const mine = rows.filter(r => (r.rep || r.user) === repName);
-    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:13px;font-weight:700;color:#000;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;';
     let total = 0;
 
     const rowsArray = mine.map((t, i) => {
@@ -912,7 +1032,7 @@
         '<td style="' + cellStyle + '">' + escapeHtml(t.date || '') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
-        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + String(Math.round(Number(t.amount) || 0)) + '</td>' +
         '<td style="' + cellStyle + '">' + st.text + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
@@ -921,14 +1041,14 @@
     });
 
     const headerHtml =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#000;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:6px;">' +
+      '<div style="text-align:center;font-size:16px;font-weight:900;color:#000;margin-bottom:6px;">' +
         'تقرير تفصيلي — المندوب: ' + escapeHtml(repName) +
       '</div>' +
-      '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:20px;">' +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#000;margin-bottom:20px;">' +
         'من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
       '</div>';
 
@@ -945,8 +1065,8 @@
 
     // total يُحسب هنا بعد اكتمال map فوق، فنبني الفوتر بعد حساب rowsArray
     const footerHtml =
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+      '<div style="text-align:left;font-size:18px;font-weight:900;color:#000;margin-bottom:34px;">إجمالي مشاوير المندوب: ' + String(Math.round(total)) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#000;margin-top:44px;">' +
         '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
@@ -955,8 +1075,8 @@
   }
 
   async function generateReportPDFBlob() {
-    const cellStyle = 'border:1px solid #999;padding:7px;font-size:12px;text-align:center;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
+    const cellStyle = 'border:1px solid #999;padding:7px;font-size:13px;font-weight:700;color:#000;text-align:center;';
+    const thStyle = cellStyle + 'background:#eee;';
     const repName = repInput.value.trim() || (currentUser ? currentUser.name : '—');
     let total = 0;
 
@@ -968,7 +1088,7 @@
         '<td style="' + cellStyle + '">' + escapeHtml(repName) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.from) + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.to) + '</td>' +
-        '<td style="' + cellStyle + '">' + Number(t.amount).toLocaleString('ar-EG') + '</td>' +
+        '<td style="' + cellStyle + '">' + String(Math.round(Number(t.amount) || 0)) + '</td>' +
         '<td style="' + cellStyle + '">' + st.text + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l2 || '—') + '</td>' +
         '<td style="' + cellStyle + '">' + escapeHtml(t.approver_l3 || '—') + '</td>' +
@@ -977,11 +1097,11 @@
     });
 
     const headerHtml =
-      '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:18px;">' +
-        '<div style="font-size:21px;font-weight:900;">شركة كومكس الصناعية</div>' +
-        '<div style="font-size:15px;font-weight:500;margin-top:3px;">(إدارة المبيعات)</div>' +
+      '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:18px;">' +
+        '<div style="font-size:21px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#000;margin-top:3px;">(إدارة المبيعات)</div>' +
       '</div>' +
-      '<div style="text-align:center;font-size:16px;font-weight:700;margin-bottom:20px;">' +
+      '<div style="text-align:center;font-size:16px;font-weight:900;color:#000;margin-bottom:20px;">' +
         'تقرير انتقالات يومي عن يوم (' + formatArabicDate(currentDate) + ') محافظة (' + escapeHtml(govInput.value.trim() || '—') + ')' +
       '</div>';
 
@@ -997,8 +1117,8 @@
       '<th style="' + thStyle + '">ملاحظات</th>';
 
     const footerHtml =
-      '<div style="text-align:left;font-size:16px;font-weight:700;margin-bottom:34px;">الإجمالي: ' + total.toLocaleString('ar-EG') + ' ج.م</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:44px;">' +
+      '<div style="text-align:left;font-size:18px;font-weight:900;color:#000;margin-bottom:34px;">الإجمالي: ' + String(Math.round(total)) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#000;margin-top:44px;">' +
         '<div>اسم المندوب: ' + escapeHtml(repName) + '</div>' +
         '<div>يعتمد: ______________________</div>' +
       '</div>';
@@ -1027,20 +1147,33 @@
     const statusTitle = statusLabelMap[statusOption] || 'كل الحالات';
     const reps = Array.from(new Set(rows.map(r => r.rep || 'بدون اسم'))).sort();
     const dates = dateRangeArray(fromDate, toDate);
+    const arabicWeekdaysFull = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    function weekdayFull(dateStr) {
+      const dt = new Date(dateStr + 'T00:00:00');
+      return arabicWeekdaysFull[dt.getDay()];
+    }
+    // بدون فاصلة الآلاف وبدون كسور عشرية — رقم صريح زي 1500 مش 1,500
+    function fmt(n) { return String(Math.round(Number(n) || 0)); }
 
     // matrix[rep][date] = المبلغ
     const matrix = {};
     reps.forEach(rep => { matrix[rep] = {}; dates.forEach(d => { matrix[rep][d] = 0; }); });
+    // أيام التسجيل الفعلية لكل مندوب (لحساب المتوسط الصحيح، مش على كل أيام الفترة)
+    const repActiveDays = {};
+    reps.forEach(rep => { repActiveDays[rep] = new Set(); });
     rows.forEach(r => {
       const rep = r.rep || 'بدون اسم';
       const d = r.date;
       if (!matrix[rep]) { matrix[rep] = {}; dates.forEach(dd => { matrix[rep][dd] = 0; }); }
+      if (!repActiveDays[rep]) repActiveDays[rep] = new Set();
       if (matrix[rep][d] === undefined) matrix[rep][d] = 0;
       matrix[rep][d] += Number(r.amount || 0);
+      if (d) repActiveDays[rep].add(d);
     });
 
-    // إجمالي كل مندوب لكامل الفترة، وإجمالي كل يوم لكل المندوبين، والإجمالي الكلي
+    // إجمالي كل مندوب لكامل الفترة، ومتوسطه اليومي (على أيام تسجيله فعليًا فقط)، وإجمالي كل يوم، والإجمالي الكلي
     const repTotal = {};
+    const repAvg = {};
     const dateTotal = {};
     dates.forEach(d => { dateTotal[d] = 0; });
     let grandTotal = 0;
@@ -1053,15 +1186,21 @@
         grandTotal += v;
       });
       repTotal[rep] = rt;
+      const activeDays = Math.max(1, repActiveDays[rep] ? repActiveDays[rep].size : 0);
+      repAvg[rep] = rt / activeDays;
     });
 
-    const cellStyle = 'border:1px solid #999;padding:5px;font-size:10px;text-align:center;overflow-wrap:break-word;';
-    const thStyle = cellStyle + 'background:#eee;font-weight:700;';
-    const totalColStyle = cellStyle + 'background:#f4f4f4;font-weight:700;';
-    const repCellStyle = cellStyle + 'text-align:right;';
-    const repTotalCellStyle = totalColStyle + 'text-align:right;';
+    const zeroBg = '#FEF08A';
+    const borderStyle = 'border:1px solid #999;padding:5px;color:#000;text-align:center;';
+    // خط اسم المندوب: صغير وثابت وبدون التفاف — ما بيتكبرش وما بيعملش wrap، بيتقص بعلامة ... لو طويل
+    const repCellStyle = borderStyle + 'font-size:10px;font-weight:700;text-align:right;white-space:nowrap;overflow:hidden;';
+    // خط المبالغ: أكبر وضح
+    const cellStyle = borderStyle + 'font-size:14px;font-weight:900;';
+    const thStyle = borderStyle + 'font-size:11px;font-weight:900;background:#eee;';
+    const totalColStyle = cellStyle + 'background:#f4f4f4;';
+    const repTotalCellStyle = 'border:1px solid #999;padding:5px;color:#000;text-align:right;font-size:11px;font-weight:900;background:#f4f4f4;';
 
-    // تقسيم الأيام لمجموعات أعمدة بحيث كل صفحة تحمل عمود التاريخ + إجمالي المندوب مهما كان عدد الأيام
+    // تقسيم الأيام لمجموعات أعمدة بحيث كل صفحة تحمل عمود المندوب + الإجمالي + المتوسط مهما كان عدد الأيام
     const DATE_COLS_PER_PAGE = 10;
     const dateChunks = [];
     for (let i = 0; i < dates.length; i += DATE_COLS_PER_PAGE) {
@@ -1088,49 +1227,54 @@
         const chunkDates = dateChunks[dc];
         const isVeryLastPage = (rc === repChunks.length - 1 && dc === dateChunks.length - 1);
 
-        const repColWidth = 18;
-        const totalColWidth = 10;
-        const dateColWidth = ((100 - repColWidth - totalColWidth) / Math.max(1, chunkDates.length)).toFixed(2);
+        const repColWidth = 16;
+        const totalColWidth = 9;
+        const avgColWidth = 9;
+        const dateColWidth = ((100 - repColWidth - totalColWidth - avgColWidth) / Math.max(1, chunkDates.length)).toFixed(2);
 
         let colgroupHtml = '<colgroup><col style="width:' + repColWidth + '%">';
         chunkDates.forEach(() => { colgroupHtml += '<col style="width:' + dateColWidth + '%">'; });
-        colgroupHtml += '<col style="width:' + totalColWidth + '%"></colgroup>';
+        colgroupHtml += '<col style="width:' + totalColWidth + '%"><col style="width:' + avgColWidth + '%"></colgroup>';
 
         const theadHtml =
           '<th style="' + thStyle + '">المندوب</th>' +
-          chunkDates.map(d => '<th style="' + thStyle + '">' + escapeHtml(d.slice(5)) + '</th>').join('') +
-          '<th style="' + thStyle + '">إجمالي الفترة</th>';
+          chunkDates.map(d => '<th style="' + thStyle + '">' + weekdayFull(d) + '<br><span style="font-size:9px;font-weight:400;">' + d.slice(5) + '</span></th>').join('') +
+          '<th style="' + thStyle + '">إجمالي الفترة</th>' +
+          '<th style="' + thStyle + '">متوسط القيمة اليومي</th>';
 
         const bodyRowsHtml = chunkReps.map(rep => {
           const cells = chunkDates.map(d => {
             const v = matrix[rep][d] || 0;
-            return '<td style="' + cellStyle + '">' + (v ? v.toLocaleString('ar-EG') : '—') + '</td>';
+            const zeroStyle = v === 0 ? ('background:' + zeroBg + ';') : '';
+            return '<td style="' + cellStyle + zeroStyle + '">' + (v ? fmt(v) : '—') + '</td>';
           }).join('');
           return '<tr><td style="' + repCellStyle + '">' + escapeHtml(rep) + '</td>' + cells +
-            '<td style="' + totalColStyle + '">' + repTotal[rep].toLocaleString('ar-EG') + '</td></tr>';
+            '<td style="' + totalColStyle + '">' + fmt(repTotal[rep]) + '</td>' +
+            '<td style="' + totalColStyle + '">' + fmt(repAvg[rep]) + '</td></tr>';
         }).join('');
 
         const totalsRowHtml =
           '<tr>' +
             '<td style="' + repTotalCellStyle + '">إجمالي اليوم</td>' +
-            chunkDates.map(d => '<td style="' + totalColStyle + '">' + dateTotal[d].toLocaleString('ar-EG') + '</td>').join('') +
-            '<td style="' + totalColStyle + '">' + grandTotal.toLocaleString('ar-EG') + '</td>' +
+            chunkDates.map(d => '<td style="' + totalColStyle + '">' + fmt(dateTotal[d]) + '</td>').join('') +
+            '<td style="' + totalColStyle + '">' + fmt(grandTotal) + '</td>' +
+            '<td style="' + totalColStyle + '">—</td>' +
           '</tr>';
 
         const headerHtml =
-          '<div style="text-align:right;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:14px;">' +
-            '<div style="font-size:19px;font-weight:900;">شركة كومكس الصناعية</div>' +
-            '<div style="font-size:13px;font-weight:500;margin-top:2px;">(إدارة المبيعات)</div>' +
+          '<div style="text-align:right;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;">' +
+            '<div style="font-size:19px;font-weight:900;color:#000;">شركة كومكس الصناعية</div>' +
+            '<div style="font-size:13px;font-weight:700;color:#000;margin-top:2px;">(إدارة المبيعات)</div>' +
           '</div>' +
-          '<div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:4px;">' +
+          '<div style="text-align:center;font-size:15px;font-weight:900;color:#000;margin-bottom:4px;">' +
             'تقرير إجمالي المشاوير اليومي لكل مندوب — من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
           '</div>' +
-          '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:14px;">' +
+          '<div style="text-align:center;font-size:12px;font-weight:700;color:#000;margin-bottom:14px;">' +
             'المشاوير المعروضة: ' + statusTitle +
           '</div>';
 
         const footerHtml = isVeryLastPage
-          ? '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:26px;">' +
+          ? '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#000;margin-top:26px;">' +
               '<div>تاريخ الإصدار: ' + formatArabicDate(todayISO()) + '</div>' +
               '<div>يعتمد: ______________________</div>' +
             '</div>'
@@ -1144,7 +1288,7 @@
         container.style.background = '#ffffff';
         container.style.fontFamily = "'Tajawal', sans-serif";
         container.setAttribute('dir', 'rtl');
-        container.style.color = '#1a1a1a';
+        container.style.color = '#000000';
         container.style.padding = '28px 34px';
         container.style.boxSizing = 'border-box';
 
@@ -1157,11 +1301,11 @@
           '</table>' +
           footerHtml +
           (totalPages > 1
-            ? '<div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">صفحة ' + pageIndex + ' من ' + totalPages + '</div>'
+            ? '<div style="text-align:center;font-size:10px;font-weight:700;color:#000;margin-top:10px;">صفحة ' + pageIndex + ' من ' + totalPages + '</div>'
             : '');
 
         document.body.appendChild(container);
-        await new Promise(r => setTimeout(r, 40));
+        await new Promise(r => setTimeout(r, 70));
         const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
         document.body.removeChild(container);
         canvases.push(canvas);
@@ -1390,6 +1534,11 @@
     rows.forEach(t => {
       const isEdited = t.edited === true || t.edited === 'true' || t.is_edited;
       const bgClass = isEdited ? 'is-edited' : '';
+      const editedNoteHtml = isEdited
+        ? '<div style="font-size:11.5px;color:#854D0E;background:#FEF9E7;border-radius:6px;padding:4px 8px;margin:6px 0;">' +
+            'المبلغ الأصلي كان ' + Number(t.original_amount || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 }) + ' ج.م، وتم تعديله بواسطة ' + (t.edited_by ? escapeHtml(t.edited_by) : 'جهة اعتماد سابقة') +
+          '</div>'
+        : '';
       html +=
         '<div class="trip-row ' + bgClass + '" style="display:block; margin-bottom:10px; border:1px solid var(--rule);">' +
           '<div style="display:flex; justify-content:space-between; align-items:center;">' +
@@ -1397,11 +1546,12 @@
               '<input type="checkbox" class="row-select" data-id="' + t.id + '" style="width:auto;">' +
               escapeHtml(t.date) +
             '</label>' +
-            (isEdited ? '<span class="badge badge-edited-tag">تم التعديل</span>' : '') +
+            (isEdited ? '<span class="badge badge-edited-tag">تم تعديل المبلغ</span>' : '') +
           '</div>' +
           '<div class="trip-notes" style="margin:6px 0 8px;">' +
             escapeHtml(t.gov || '—') + ' — من (' + escapeHtml(t.from) + ') إلى (' + escapeHtml(t.to) + ')' +
           '</div>' +
+          editedNoteHtml +
           '<div class="two-col" style="margin-bottom:8px;">' +
             '<div><label>المبلغ</label><input type="number" class="row-amount" data-id="' + t.id + '" value="' + t.amount + '"></div>' +
             '<div><label>ملاحظات</label><input type="text" class="row-notes" data-id="' + t.id + '" value="' + escapeHtml(t.notes || '') + '"></div>' +
@@ -1802,11 +1952,19 @@
 
   function applyRoleUI() {
     if (currentUser.role === 'rep') {
+      repTabs.style.display = 'flex';
       repCard.style.display = '';
+      ordersCard.style.display = 'none';
       adminPanel.style.display = 'none';
       userLabel.textContent = 'المندوب: ' + currentUser.name;
+      orderDateInput.value = currentOrderDate;
+      orderDateDisplay.textContent = formatArabicDate(currentOrderDate);
+      orderReportFrom.value = currentOrderDate;
+      orderReportTo.value = currentOrderDate;
     } else {
+      repTabs.style.display = 'none';
       repCard.style.display = 'none';
+      ordersCard.style.display = 'none';
       adminPanel.style.display = '';
       if (currentUser.role === 'level2') {
         adminPanelTitle.textContent = 'لوحة اعتماد — مستوى 1';
@@ -1824,6 +1982,25 @@
       reportBtn.click();
     }
   }
+
+  tabTripsBtn.addEventListener('click', () => {
+    repCard.style.display = '';
+    ordersCard.style.display = 'none';
+    tabTripsBtn.style.background = '';
+    tabTripsBtn.style.color = '';
+    tabOrdersBtn.style.background = '#fff';
+    tabOrdersBtn.style.color = 'var(--accent-dark)';
+  });
+
+  tabOrdersBtn.addEventListener('click', () => {
+    ordersCard.style.display = '';
+    repCard.style.display = 'none';
+    tabOrdersBtn.style.background = '';
+    tabOrdersBtn.style.color = '';
+    tabTripsBtn.style.background = '#fff';
+    tabTripsBtn.style.color = 'var(--accent-dark)';
+    loadOrders(currentOrderDate);
+  });
 
   changePwBtn.addEventListener('click', () => {
     const showing = changePwPanel.style.display !== 'none';
@@ -1927,6 +2104,226 @@
     loginUsername.value = '';
     loginPassword.value = '';
     loginError.textContent = '';
+  });
+
+  function renderOrders() {
+    orderListEl.innerHTML = '';
+    if (currentOrders.length === 0) {
+      orderEmptyMsg.style.display = 'block';
+    } else {
+      orderEmptyMsg.style.display = 'none';
+      currentOrders.forEach((o, i) => {
+        const row = document.createElement('div');
+        row.className = 'trip-row';
+        const actionHtml = o.sent
+          ? '<span class="trip-sent">✓</span>'
+          : '<button class="trip-del" data-i="' + i + '">✕</button>';
+        row.innerHTML =
+          '<div class="trip-main">' +
+            '<div class="trip-route">' + escapeHtml(o.customer) + ' — ' + escapeHtml(o.item) + '</div>' +
+            '<div class="trip-notes">' + escapeHtml(o.gov || '—') + ' / ' + escapeHtml(o.center || '—') + '</div>' +
+          '</div>' +
+          '<div class="trip-amount">' + fmtPlain(o.value) + '</div>' +
+          actionHtml;
+        orderListEl.appendChild(row);
+      });
+      orderListEl.querySelectorAll('.trip-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentOrders.splice(Number(btn.getAttribute('data-i')), 1);
+          renderOrders();
+        });
+      });
+    }
+    const total = currentOrders.reduce((s, o) => s + Number(o.value || 0), 0);
+    orderTotalValue.textContent = fmtPlain(total) + ' ج.م';
+  }
+
+  function showOrderToast(msg) {
+    orderToast.textContent = msg;
+    setTimeout(() => { if (orderToast.textContent === msg) orderToast.textContent = ''; }, 6000);
+  }
+
+  async function loadOrders(dateIso) {
+    if (!currentUser) { currentOrders = []; renderOrders(); return; }
+    try {
+      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: dateIso, to: dateIso }));
+      currentOrders = (Array.isArray(data) ? data : []).map(o => ({
+        gov: o.gov, center: o.center, customer: o.customer, item: o.item, value: o.value, sent: true
+      }));
+    } catch (e) {
+      currentOrders = [];
+      showOrderToast('تعذر تحميل الطلبيات: ' + (e && e.message ? e.message : String(e)));
+    }
+    renderOrders();
+  }
+
+  async function trySendOrder(order) {
+    try {
+      const url = apiUrl({
+        action: 'add_order',
+        date: currentOrderDate,
+        gov: order.gov || '',
+        center: order.center || '',
+        customer: order.customer,
+        item: order.item,
+        value: order.value,
+        client_id: order.clientId || ''
+      });
+      const data = await jsonpRequest(url);
+      if (data && data.status === 'ok') {
+        order.sent = true;
+        renderOrders();
+        return true;
+      }
+      showOrderToast((data && data.message) ? data.message : 'رد غير متوقع من السيرفر');
+      return false;
+    } catch (e) {
+      showOrderToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+      return false;
+    }
+  }
+
+  orderDateInput.addEventListener('change', () => {
+    currentOrderDate = orderDateInput.value || todayISO();
+    orderDateDisplay.textContent = formatArabicDate(currentOrderDate);
+    loadOrders(currentOrderDate);
+  });
+
+  addOrderBtn.addEventListener('click', () => {
+    const gov = orderGovInput.value.trim();
+    const center = orderCenterInput.value.trim();
+    const customer = orderCustomerInput.value.trim();
+    const item = orderItemInput.value.trim();
+    const value = parseFloat(orderValueInput.value);
+    if (!customer || !item || !value || value <= 0) {
+      showOrderToast('اكتب العميل والصنف والقيمة الأول');
+      return;
+    }
+    currentOrders.push({
+      gov, center, customer, item, value, sent: false,
+      clientId: 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2)
+    });
+    renderOrders();
+    orderCustomerInput.value = '';
+    orderItemInput.value = '';
+    orderValueInput.value = '';
+    showOrderToast('اتضافت محليًا — دوس "حفظ الطلبيات" عشان تتسجل فعليًا');
+  });
+
+  let isSavingOrders = false;
+  saveOrdersBtn.addEventListener('click', async () => {
+    if (isSavingOrders) return;
+    const unsent = currentOrders.filter(o => !o.sent);
+    if (unsent.length === 0) { showOrderToast('كل الطلبيات متسجلة بالفعل'); return; }
+    isSavingOrders = true;
+    setBusy(true);
+    showOrderToast('جاري حفظ الطلبيات...');
+    let okCount = 0;
+    for (const o of unsent) {
+      if (o.sent) { okCount++; continue; }
+      const ok = await trySendOrder(o);
+      if (ok) okCount++;
+    }
+    if (okCount === unsent.length) {
+      showOrderToast('تم حفظ الطلبيات');
+    }
+    isSavingOrders = false;
+    setBusy(false);
+  });
+
+  orderCustomerReportBtn.addEventListener('click', async () => {
+    const fromDate = orderReportFrom.value || currentOrderDate;
+    const toDate = orderReportTo.value || currentOrderDate;
+    setBusy(true);
+    orderCustomerReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">جاري التحميل...</div>';
+    try {
+      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: fromDate, to: toDate }));
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length === 0) {
+        orderCustomerReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">مفيش طلبيات في الفترة دي</div>';
+        return;
+      }
+      const byCustomer = {};
+      rows.forEach(o => {
+        const c = o.customer || 'بدون اسم';
+        if (!byCustomer[c]) byCustomer[c] = { total: 0, items: {} };
+        byCustomer[c].total += Number(o.value || 0);
+        const it = o.item || 'غير محدد';
+        byCustomer[c].items[it] = (byCustomer[c].items[it] || 0) + Number(o.value || 0);
+      });
+      let html = '';
+      Object.keys(byCustomer).sort((a, b) => byCustomer[b].total - byCustomer[a].total).forEach(c => {
+        const itemsList = Object.keys(byCustomer[c].items)
+          .sort((a, b) => byCustomer[c].items[b] - byCustomer[c].items[a])
+          .map(it => escapeHtml(it) + ' (' + fmtPlain(byCustomer[c].items[it]) + ')').join('، ');
+        html += '<div class="trip-row" style="display:block;">' +
+          '<div style="display:flex;justify-content:space-between;"><strong>' + escapeHtml(c) + '</strong><span>' + fmtPlain(byCustomer[c].total) + ' ج.م</span></div>' +
+          '<div class="trip-notes" style="margin-top:4px;">الأصناف: ' + itemsList + '</div>' +
+        '</div>';
+      });
+      orderCustomerReportResults.innerHTML = html;
+    } catch (e) {
+      orderCustomerReportResults.innerHTML = '<div style="color:var(--danger);text-align:center;font-size:13px;padding:8px 0;">خطأ: ' + (e && e.message ? e.message : String(e)) + '</div>';
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  ordersReportBtn.addEventListener('click', async () => {
+    const fromDate = reportFrom.value || todayISO();
+    const toDate = reportTo.value || todayISO();
+    setBusy(true);
+    ordersReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">جاري التحميل...</div>';
+    try {
+      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: fromDate, to: toDate }));
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length === 0) {
+        ordersReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">مفيش طلبيات في الفترة دي</div>';
+        return;
+      }
+      const totalValue = rows.reduce((s, o) => s + Number(o.value || 0), 0);
+      const uniqueCustomers = new Set(rows.map(o => o.customer)).size;
+      const uniqueItems = new Set(rows.map(o => o.item)).size;
+
+      let html = '<div class="kpi-grid">' +
+        kpiCard('عدد الطلبيات', rows.length) +
+        kpiCard('إجمالي القيمة', fmtPlain(totalValue) + ' ج.م') +
+        kpiCard('عدد العملاء', uniqueCustomers) +
+        kpiCard('عدد الأصناف', uniqueItems) +
+      '</div>';
+
+      const byCustomer = {};
+      rows.forEach(o => { const c = o.customer || 'بدون اسم'; byCustomer[c] = (byCustomer[c] || 0) + Number(o.value || 0); });
+      const topCustomers = Object.keys(byCustomer).sort((a, b) => byCustomer[b] - byCustomer[a]).slice(0, 10);
+      html += '<div class="list-title">أكتر 10 عملاء</div>';
+      topCustomers.forEach(c => {
+        html += '<div class="trip-row"><div class="trip-main"><div class="trip-route">' + escapeHtml(c) + '</div></div><div class="trip-amount">' + fmtPlain(byCustomer[c]) + '</div></div>';
+      });
+
+      const byItem = {};
+      rows.forEach(o => { const it = o.item || 'غير محدد'; byItem[it] = (byItem[it] || 0) + Number(o.value || 0); });
+      const topItems = Object.keys(byItem).sort((a, b) => byItem[b] - byItem[a]).slice(0, 10);
+      html += '<div class="list-title">أكتر 10 أصناف</div>';
+      topItems.forEach(it => {
+        html += '<div class="trip-row"><div class="trip-main"><div class="trip-route">' + escapeHtml(it) + '</div></div><div class="trip-amount">' + fmtPlain(byItem[it]) + '</div></div>';
+      });
+
+      const byRep = {};
+      rows.forEach(o => { const r = o.rep || 'بدون اسم'; byRep[r] = (byRep[r] || 0) + Number(o.value || 0); });
+      const repsSorted = Object.keys(byRep).sort((a, b) => byRep[b] - byRep[a]);
+      if (repsSorted.length > 1) {
+        html += '<div class="list-title">إجمالي كل مندوب</div>';
+        repsSorted.forEach(r => {
+          html += '<div class="trip-row"><div class="trip-main"><div class="trip-route">' + escapeHtml(r) + '</div></div><div class="trip-amount">' + fmtPlain(byRep[r]) + '</div></div>';
+        });
+      }
+
+      ordersReportResults.innerHTML = html;
+    } catch (e) {
+      ordersReportResults.innerHTML = '<div style="color:var(--danger);text-align:center;font-size:13px;padding:8px 0;">خطأ: ' + (e && e.message ? e.message : String(e)) + '</div>';
+    } finally {
+      setBusy(false);
+    }
   });
 
   (function restoreSession() {
