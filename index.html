@@ -375,6 +375,25 @@
     <div class="toast" id="toast"></div>
   </div>
 
+  <div class="receipt" id="uploader-card" style="display:none;">
+    <div class="head">
+      <h1>رفع بيانات الطلبيات</h1>
+      <p>ارفع ملف إكسيل فيه: التاريخ، اسم المندوب، قيمة الطلبيات</p>
+    </div>
+    <div class="field-row">
+      <div>
+        <label>اختر ملف الإكسيل (xlsx / xls / csv)</label>
+        <input type="file" id="orders-file-input" accept=".xlsx,.xls,.csv">
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);padding:0 18px 8px;">
+      لازم يكون الصف الأول عناوين بالظبط: <strong>التاريخ</strong>، <strong>المندوب</strong>، <strong>القيمة</strong>. لو نفس المندوب ونفس التاريخ اتكرر في رفعة تانية، القيمة القديمة بتتحدّث ومفيش تكرار.
+    </div>
+    <button class="add-btn" id="upload-orders-btn">⬆ رفع الملف</button>
+    <div id="upload-orders-status" style="padding:10px 18px; font-size:13px; text-align:center; color:var(--ink-soft);"></div>
+    <div class="toast" id="uploader-toast"></div>
+  </div>
+
   <div class="receipt" id="admin-panel" style="display:none; margin-top:12px;">
     <div class="head">
       <h1 id="admin-panel-title">لوحة الاعتماد</h1>
@@ -424,6 +443,11 @@
 
     <button class="add-btn" id="attendance-btn" style="margin:14px 18px 6px;">حاله تسجيل المندوبين للمشاوير خلال الفتره</button>
     <div id="attendance-results" style="padding:4px 18px 4px;"></div>
+
+    <div class="list-title" style="margin-top:20px; border-top:2px dashed var(--rule); padding-top:16px;">نسبة المشاوير للطلبيات (بنفس الفترة المختارة فوق)</div>
+    <button class="add-btn" id="orders-report-btn" style="margin:6px 18px 6px;">عرض النسبة لكل مندوب</button>
+    <div id="orders-report-results" style="padding:4px 18px 4px;"></div>
+    <button class="add-btn" id="orders-matrix-pdf-btn" style="margin:10px 18px 16px;">تنزيل مصفوفة الطلبيات (مندوبين × أيام) PDF</button>
   </div>
 </div>
 
@@ -460,6 +484,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function () {
   const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbyKFubhroh4kljVprUBprowySWU2khf8O5m49fjbK2xkSogv5-jG7wX7x99guBwu34v/exec';
@@ -519,6 +544,15 @@
   const matrixStatusFilter = document.getElementById('matrix-status-filter');
   const attendanceBtn = document.getElementById('attendance-btn');
   const attendanceResults = document.getElementById('attendance-results');
+
+  const uploaderCard = document.getElementById('uploader-card');
+  const ordersFileInput = document.getElementById('orders-file-input');
+  const uploadOrdersBtn = document.getElementById('upload-orders-btn');
+  const uploadOrdersStatus = document.getElementById('upload-orders-status');
+  const uploaderToast = document.getElementById('uploader-toast');
+  const ordersReportBtn = document.getElementById('orders-report-btn');
+  const ordersReportResults = document.getElementById('orders-report-results');
+  const ordersMatrixPdfBtn = document.getElementById('orders-matrix-pdf-btn');
   let lastAggregate = null;
   let currentActionableByRep = {};
   
@@ -659,6 +693,8 @@
   function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+
+  function fmtPlain(n) { return String(Math.round(Number(n) || 0)); }
 
   function apiUrl(params) {
     const p = new URLSearchParams(params);
@@ -1031,9 +1067,11 @@
 
   // يبني تقرير مصفوفة (المندوبين أفقيًا × الأيام رأسيًا) بصيغة PDF أفقي (Landscape)
   // مع إجمالي لكل عمود (مندوب) وإجمالي لكل صف (يوم)، وإجمالي كلي في الزاوية.
-  async function generateMatrixPDFBlob(fromDate, toDate, rows, statusOption) {
+  async function generateMatrixPDFBlob(fromDate, toDate, rows, statusOption, reportTitle, statusLinePrefix) {
     const statusLabelMap = { all: 'كل الحالات', approved: 'المعتمدة نهائيًا فقط', pending: 'غير المعتمدة فقط', rejected: 'المرفوضة فقط' };
     const statusTitle = statusLabelMap[statusOption] || 'كل الحالات';
+    reportTitle = reportTitle || 'تقرير إجمالي المشاوير اليومي لكل مندوب';
+    statusLinePrefix = statusLinePrefix || 'المشاوير المعروضة';
     const reps = Array.from(new Set(rows.map(r => r.rep || 'بدون اسم'))).sort();
     const dates = dateRangeArray(fromDate, toDate);
     const arabicWeekdaysFull = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -1156,10 +1194,10 @@
             '<div style="font-size:13px;font-weight:700;color:#000;margin-top:2px;">(إدارة المبيعات)</div>' +
           '</div>' +
           '<div style="text-align:center;font-size:15px;font-weight:900;color:#000;margin-bottom:4px;">' +
-            'تقرير إجمالي المشاوير اليومي لكل مندوب — من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
+            reportTitle + ' — من (' + formatArabicDate(fromDate) + ') إلى (' + formatArabicDate(toDate) + ')' +
           '</div>' +
           '<div style="text-align:center;font-size:12px;font-weight:700;color:#000;margin-bottom:14px;">' +
-            'المشاوير المعروضة: ' + statusTitle +
+            statusLinePrefix + ': ' + statusTitle +
           '</div>';
 
         const footerHtml = isVeryLastPage
@@ -1840,12 +1878,17 @@
   });
 
   function applyRoleUI() {
+    repCard.style.display = 'none';
+    uploaderCard.style.display = 'none';
+    adminPanel.style.display = 'none';
+
     if (currentUser.role === 'rep') {
       repCard.style.display = '';
-      adminPanel.style.display = 'none';
       userLabel.textContent = 'المندوب: ' + currentUser.name;
+    } else if (currentUser.role === 'uploader') {
+      uploaderCard.style.display = '';
+      userLabel.textContent = currentUser.name + ' (رفع الطلبيات)';
     } else {
-      repCard.style.display = 'none';
       adminPanel.style.display = '';
       if (currentUser.role === 'level2') {
         adminPanelTitle.textContent = 'لوحة اعتماد — مستوى 1';
@@ -1967,6 +2010,186 @@
     loginPassword.value = '';
     loginError.textContent = '';
   });
+
+  // ===== رفع بيانات الطلبيات من ملف إكسيل (مستخدم uploader فقط) =====
+
+  function showUploaderToast(msg) {
+    uploaderToast.textContent = msg;
+    setTimeout(() => { if (uploaderToast.textContent === msg) uploaderToast.textContent = ''; }, 6000);
+  }
+
+  function normalizeExcelDate(v) {
+    // بيدعم لو الخلية جايه كتاريخ إكسيل حقيقي أو كنص "2026-09-20" أو "20/09/2026"
+    if (v instanceof Date) {
+      const y = v.getFullYear();
+      const m = String(v.getMonth() + 1).padStart(2, '0');
+      const d = String(v.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    }
+    const s = String(v || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) return m1[3] + '-' + m1[2].padStart(2, '0') + '-' + m1[1].padStart(2, '0');
+    return s;
+  }
+
+  uploadOrdersBtn.addEventListener('click', async () => {
+    const file = ordersFileInput.files && ordersFileInput.files[0];
+    if (!file) { showUploaderToast('اختر ملف الأول'); return; }
+    setBusy(true);
+    uploadOrdersStatus.textContent = 'جاري قراءة الملف...';
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      const parsed = [];
+      let badRows = 0;
+      rawRows.forEach(r => {
+        const dateVal = r['التاريخ'];
+        const repVal = String(r['المندوب'] || '').trim();
+        const valueVal = Number(r['القيمة']);
+        const dateStr = normalizeExcelDate(dateVal);
+        if (!repVal || !dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || isNaN(valueVal)) {
+          badRows++;
+          return;
+        }
+        parsed.push({ date: dateStr, rep: repVal, value: valueVal });
+      });
+
+      if (parsed.length === 0) {
+        uploadOrdersStatus.textContent = 'مفيش صفوف صالحة في الملف. تأكد إن العناوين بالظبط: التاريخ، المندوب، القيمة';
+        setBusy(false);
+        return;
+      }
+
+      const CHUNK_SIZE = 25;
+      const chunks = [];
+      for (let i = 0; i < parsed.length; i += CHUNK_SIZE) {
+        chunks.push(parsed.slice(i, i + CHUNK_SIZE));
+      }
+
+      let totalInserted = 0, totalUpdated = 0, totalSkipped = 0;
+      for (let i = 0; i < chunks.length; i++) {
+        uploadOrdersStatus.textContent = 'جاري رفع الدفعة ' + (i + 1) + ' من ' + chunks.length + '...';
+        const url = apiUrl({ action: 'upload_orders', rows: JSON.stringify(chunks[i]) });
+        const data = await jsonpRequest(url);
+        if (data && data.status === 'ok') {
+          totalInserted += data.inserted || 0;
+          totalUpdated += data.updated || 0;
+          totalSkipped += data.skipped || 0;
+        } else {
+          uploadOrdersStatus.textContent = 'حصل خطأ في الدفعة ' + (i + 1) + ': ' + ((data && data.message) || 'خطأ غير معروف');
+          setBusy(false);
+          return;
+        }
+      }
+
+      uploadOrdersStatus.textContent =
+        'تم الرفع بنجاح ✔ — إضافة جديدة: ' + totalInserted + ' — تحديث لصفوف موجودة: ' + totalUpdated +
+        (badRows > 0 ? ' — صفوف متجاهلة (بيانات ناقصة): ' + badRows : '');
+      ordersFileInput.value = '';
+    } catch (e) {
+      uploadOrdersStatus.textContent = 'خطأ: ' + (e && e.message ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  // ===== تقرير نسبة المشاوير للطلبيات (لمستوى 1 و2 والأدمن) =====
+
+  let lastOrdersRatioData = null;
+
+  ordersReportBtn.addEventListener('click', async () => {
+    const fromDate = reportFrom.value || todayISO();
+    const toDate = reportTo.value || todayISO();
+    setBusy(true);
+    ordersReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">جاري التحميل...</div>';
+    try {
+      const [tripRows, orderRowsRaw] = await Promise.all([
+        fetchAllTripsInRange(fromDate, toDate),
+        jsonpRequest(apiUrl({ action: 'list_orders', from: fromDate, to: toDate }))
+      ]);
+      const orderRows = Array.isArray(orderRowsRaw) ? orderRowsRaw : [];
+
+      const { perRep: tripsPerRep } = aggregateEntries(tripRows || []);
+      const ordersPerRep = {};
+      orderRows.forEach(o => {
+        const rep = o.rep || 'بدون اسم';
+        ordersPerRep[rep] = (ordersPerRep[rep] || 0) + Number(o.value || 0);
+      });
+
+      const allReps = new Set([...Object.keys(tripsPerRep), ...Object.keys(ordersPerRep)]);
+      if (allReps.size === 0) {
+        ordersReportResults.innerHTML = '<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">مفيش بيانات مشاوير أو طلبيات في الفترة دي</div>';
+        lastOrdersRatioData = null;
+        return;
+      }
+
+      const combined = {};
+      let grandTrips = 0, grandOrders = 0;
+      allReps.forEach(rep => {
+        const tripsTotal = tripsPerRep[rep] ? tripsPerRep[rep].total : 0;
+        const ordersTotal = ordersPerRep[rep] || 0;
+        const ratio = ordersTotal > 0 ? (tripsTotal / ordersTotal * 100) : null;
+        combined[rep] = { tripsTotal, ordersTotal, ratio };
+        grandTrips += tripsTotal;
+        grandOrders += ordersTotal;
+      });
+      const grandRatio = grandOrders > 0 ? (grandTrips / grandOrders * 100) : null;
+      lastOrdersRatioData = { fromDate, toDate, combined, grandTrips, grandOrders, grandRatio };
+
+      let html = '<div class="kpi-grid">' +
+        kpiCard('إجمالي المشاوير', fmtPlain(grandTrips) + ' ج.م') +
+        kpiCard('إجمالي الطلبيات', fmtPlain(grandOrders) + ' ج.م') +
+        kpiCard('نسبة المشاوير للطلبيات', grandRatio === null ? '—' : grandRatio.toFixed(1) + '%') +
+      '</div>';
+
+      html += '<div class="list-title">لكل مندوب</div>';
+      Array.from(allReps).sort((a, b) => combined[b].tripsTotal - combined[a].tripsTotal).forEach(rep => {
+        const c = combined[rep];
+        html += '<div class="trip-row" style="display:block;">' +
+          '<div style="font-size:13px;font-weight:700;">' + escapeHtml(rep) + '</div>' +
+          '<div class="trip-notes" style="margin-top:3px;">' +
+            'مشاوير: ' + fmtPlain(c.tripsTotal) + ' ج.م — طلبيات: ' + fmtPlain(c.ordersTotal) + ' ج.م — النسبة: ' +
+            (c.ratio === null ? '—' : c.ratio.toFixed(1) + '%') +
+          '</div>' +
+        '</div>';
+      });
+
+      ordersReportResults.innerHTML = html;
+    } catch (e) {
+      ordersReportResults.innerHTML = '<div style="color:var(--danger);text-align:center;font-size:13px;padding:8px 0;">خطأ: ' + (e && e.message ? e.message : String(e)) + '</div>';
+      lastOrdersRatioData = null;
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  // ===== تقرير مصفوفة الطلبيات (مندوبين × أيام) — نفس شكل مصفوفة المشاوير بالظبط =====
+
+  ordersMatrixPdfBtn.addEventListener('click', async () => {
+    const fromDate = reportFrom.value || todayISO();
+    const toDate = reportTo.value || todayISO();
+    setBusy(true);
+    showToast('جاري تجهيز مصفوفة الطلبيات...');
+    try {
+      const data = await jsonpRequest(apiUrl({ action: 'list_orders', from: fromDate, to: toDate }));
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length === 0) { showToast('مفيش طلبيات في الفترة دي'); return; }
+      // نفس منطق مصفوفة المشاوير بالظبط، بس المصدر بيانات الطلبيات (rep + date + value بدل amount)
+      const mapped = rows.map(o => ({ rep: o.rep, date: o.date, amount: o.value, status: 'submitted' }));
+      const blob = await generateMatrixPDFBlob(fromDate, toDate, mapped, 'all', 'تقرير إجمالي الطلبيات اليومي لكل مندوب', 'الطلبيات المعروضة');
+      downloadBlob(blob, 'مصفوفة-الطلبيات-' + fromDate + '_' + toDate + '.pdf');
+      showToast('تم تنزيل مصفوفة الطلبيات');
+    } catch (e) {
+      showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setBusy(false);
+    }
+  });
+
 
   (function restoreSession() {
     try {
