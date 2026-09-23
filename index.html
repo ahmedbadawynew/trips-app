@@ -844,10 +844,21 @@
     canvases.forEach((canvas, idx) => {
       if (idx > 0) pdf.addPage('a4', orientation);
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = canvas.height * (imgWidth / canvas.width);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+
+      let imgWidth = maxWidth;
+      let imgHeight = canvas.height * (imgWidth / canvas.width);
+      if (imgHeight > maxHeight) {
+        // المحتوى أطول من الصفحة — نصغّره كمان بالطول (مش بس بالعرض) عشان أي حاجة متتقصش
+        imgHeight = maxHeight;
+        imgWidth = canvas.width * (imgHeight / canvas.height);
+      }
+
+      const xOffset = margin + (maxWidth - imgWidth) / 2;
       const imgData = canvas.toDataURL('image/jpeg', 0.85);
-      pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight, undefined, 'FAST');
+      pdf.addImage(imgData, 'JPEG', xOffset, margin, imgWidth, imgHeight, undefined, 'FAST');
     });
 
     return pdf.output('blob');
@@ -1233,9 +1244,14 @@
 
         document.body.appendChild(container);
         await new Promise(r => setTimeout(r, 70));
-        const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+        try {
+          const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+          canvases.push(canvas);
+        } catch (captureErr) {
+          document.body.removeChild(container);
+          throw new Error('فشل تجهيز الصفحة رقم ' + pageIndex + ' من ' + totalPages + ': ' + (captureErr && captureErr.message ? captureErr.message : String(captureErr)));
+        }
         document.body.removeChild(container);
-        canvases.push(canvas);
       }
     }
 
