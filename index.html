@@ -1081,7 +1081,7 @@
   async function generateMatrixPDFBlob(fromDate, toDate, rows, statusOption, reportTitle, statusLinePrefix) {
     const statusLabelMap = { all: 'كل الحالات', approved: 'المعتمدة نهائيًا فقط', pending: 'غير المعتمدة فقط', rejected: 'المرفوضة فقط' };
     const statusTitle = statusLabelMap[statusOption] || 'كل الحالات';
-    reportTitle = reportTitle || 'تقرير إجمالي المشاوير اليومي لكل مندوب';
+    reportTitle = reportTitle || 'تقرير إجمالي قيمة الانتقالات اليومي لكل مندوب';
     statusLinePrefix = statusLinePrefix || 'المشاوير المعروضة';
     const reps = Array.from(new Set(rows.map(r => r.rep || 'بدون اسم'))).sort();
     const dates = dateRangeArray(fromDate, toDate);
