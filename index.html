@@ -1505,7 +1505,9 @@
             '<button class="row-save-btn" data-id="' + t.id + '">حفظ التعديل</button>' +
             '<button class="primary row-approve-btn" data-id="' + t.id + '">' + approveLabel + '</button>' +
             '<button class="row-reject-btn" data-id="' + t.id + '" style="color:var(--danger);border-color:var(--danger);">رفض</button>' +
+            '<button class="row-ai-btn" data-id="' + t.id + '" data-from="' + escapeHtml(t.from) + '" data-to="' + escapeHtml(t.to) + '" data-gov="' + escapeHtml(t.gov || '') + '" data-amount="' + t.amount + '" style="color:var(--accent-dark);border-color:var(--accent);">🤖 رأي الذكاء الاصطناعي</button>' +
           '</div>' +
+          '<div class="ai-opinion-box" data-id="' + t.id + '" style="display:none; font-size:12px; color:#0C4A6E; background:#F0F9FF; border:1px solid #BAE6FD; border-radius:6px; padding:8px 10px; margin-top:6px;"></div>' +
         '</div>';
     });
     approveList.innerHTML = html;
@@ -1641,6 +1643,35 @@
           }
         } catch (e) {
           showToast('خطأ: ' + (e && e.message ? e.message : String(e)));
+        } finally {
+          setBusy(false);
+        }
+      });
+    });
+
+    approveList.querySelectorAll('.row-ai-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const box = approveList.querySelector('.ai-opinion-box[data-id="' + id + '"]');
+        const amountEl = approveList.querySelector('.row-amount[data-id="' + id + '"]');
+        box.style.display = 'block';
+        box.textContent = 'جاري سؤال الذكاء الاصطناعي...';
+        setBusy(true);
+        try {
+          const data = await jsonpRequest(apiUrl({
+            action: 'ai_review_trip',
+            from: btn.getAttribute('data-from'),
+            to: btn.getAttribute('data-to'),
+            gov: btn.getAttribute('data-gov'),
+            amount: amountEl ? amountEl.value : btn.getAttribute('data-amount')
+          }));
+          if (data && data.status === 'ok') {
+            box.textContent = '🤖 ' + data.opinion;
+          } else {
+            box.textContent = 'تعذر الحصول على رأي الذكاء الاصطناعي: ' + ((data && data.message) || 'خطأ غير معروف');
+          }
+        } catch (e) {
+          box.textContent = 'خطأ: ' + (e && e.message ? e.message : String(e));
         } finally {
           setBusy(false);
         }
