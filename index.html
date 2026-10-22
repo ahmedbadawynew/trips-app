@@ -399,6 +399,15 @@
       <h1 id="admin-panel-title">لوحة الاعتماد</h1>
       <p>يشمل كل المندوبين اللي بيستخدموا نفس الرابط</p>
     </div>
+    <div class="field-row" id="min-date-box" style="display:none; background:var(--warning-bg); border-radius:8px; padding:10px 12px; margin:0 18px 10px;">
+      <label>أقدم تاريخ مسموح بتسجيل الانتقالات فيه (قبله ممنوع على الكل)</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="date" id="min-date-input" style="flex:1;">
+        <button class="add-btn" id="min-date-save" style="margin:0; width:auto; padding:8px 14px;">حفظ</button>
+        <button class="add-btn" id="min-date-clear" style="margin:0; width:auto; padding:8px 14px; background:#999;">إلغاء الحد</button>
+      </div>
+      <div id="min-date-msg" style="font-size:12px; margin-top:6px;"></div>
+    </div>
     <div class="field-row">
       <div class="two-col">
         <div>
@@ -518,6 +527,13 @@
   const addBtn = root.querySelector('#add-btn');
   const dayLockedBanner = root.querySelector('#day-locked-banner');
   let dayLocked = false;
+  let minDate = '';
+  const minDateBox = root.querySelector('#min-date-box');
+  const minDateInput = root.querySelector('#min-date-input');
+  const minDateSave = root.querySelector('#min-date-save');
+  const minDateClear = root.querySelector('#min-date-clear');
+  const minDateMsg = root.querySelector('#min-date-msg');
+  function beforeMinDate() { return !!minDate && !!currentDate && currentDate < minDate; }
   const listEl = root.querySelector('#trip-list');
   const emptyMsg = root.querySelector('#empty-msg');
   const totalValue = root.querySelector('#total-value');
@@ -706,13 +722,57 @@
   }
 
   function applyDayLockUI() {
-    dayLockedBanner.style.display = dayLocked ? 'block' : 'none';
-    addBtn.disabled = dayLocked;
-    fromInput.disabled = dayLocked;
-    toInput.disabled = dayLocked;
-    amountInput.disabled = dayLocked;
-    notesInput.disabled = dayLocked;
+    const blocked = dayLocked || beforeMinDate();
+    if (beforeMinDate() && !dayLocked) {
+      dayLockedBanner.textContent = '⚠️ التسجيل غير مسموح قبل تاريخ ' + minDate + ' — اختر تاريخًا بعده';
+    } else {
+      dayLockedBanner.textContent = '🔒 تم حفظ هذا اليوم وقفله، ولا يمكن إضافة مشاوير جديدة له';
+    }
+    dayLockedBanner.style.display = blocked ? 'block' : 'none';
+    addBtn.disabled = blocked;
+    fromInput.disabled = blocked;
+    toInput.disabled = blocked;
+    amountInput.disabled = blocked;
+    notesInput.disabled = blocked;
   }
+
+  async function fetchMinDate() {
+    try {
+      const data = await jsonpRequest(apiUrl({ action: 'get_min_date' }));
+      minDate = (data && data.min_date) ? String(data.min_date) : '';
+    } catch (e) { minDate = ''; }
+    if (currentUser && currentUser.role === 'rep') {
+      dateInput.min = minDate || '';
+      applyDayLockUI();
+    }
+    if (minDateInput) minDateInput.value = minDate;
+  }
+
+  async function saveMinDate(value) {
+    setBusy(true);
+    minDateMsg.style.color = 'var(--ink-soft)';
+    minDateMsg.textContent = 'جاري الحفظ...';
+    try {
+      const data = await jsonpRequest(apiUrl({ action: 'set_min_date', date: value }));
+      if (data && data.status === 'ok') {
+        minDate = value;
+        minDateInput.value = value;
+        minDateMsg.style.color = 'var(--accent-dark)';
+        minDateMsg.textContent = value ? ('تم: التسجيل ممنوع قبل ' + value) : 'تم إلغاء الحد الأدنى للتاريخ';
+      } else {
+        minDateMsg.style.color = 'var(--danger)';
+        minDateMsg.textContent = (data && data.message) ? data.message : 'فشل الحفظ';
+      }
+    } catch (e) {
+      minDateMsg.style.color = 'var(--danger)';
+      minDateMsg.textContent = 'خطأ: ' + (e && e.message ? e.message : String(e));
+    } finally { setBusy(false); }
+  }
+  minDateSave.addEventListener('click', () => {
+    if (!minDateInput.value) { minDateMsg.style.color = 'var(--danger)'; minDateMsg.textContent = 'اختر تاريخًا أولًا'; return; }
+    saveMinDate(minDateInput.value);
+  });
+  minDateClear.addEventListener('click', () => saveMinDate(''));
 
   async function checkDayLock(dateIso) {
     try {
@@ -784,6 +844,10 @@
   });
 
   addBtn.addEventListener('click', () => {
+    if (beforeMinDate()) {
+      showToast('⚠️ التسجيل غير مسموح قبل تاريخ ' + minDate);
+      return;
+    }
     if (dayLocked) {
       showToast('⚠️ تم قفل مشاوير هذا اليوم سابقاً ولا يمكن إضافة مشاوير جديدة');
       return;
@@ -1930,6 +1994,8 @@
     repCard.style.display = 'none';
     uploaderCard.style.display = 'none';
     adminPanel.style.display = 'none';
+    minDateBox.style.display = 'none';
+    if (currentUser.role === 'rep' || currentUser.role === 'admin') fetchMinDate();
 
     if (currentUser.role === 'rep') {
       repCard.style.display = '';
@@ -1947,6 +2013,7 @@
         userLabel.textContent = currentUser.name + ' (اعتماد نهائي)';
       } else {
         adminPanelTitle.textContent = 'لوحة التحكم الإدارية';
+        minDateBox.style.display = '';
         userLabel.textContent = currentUser.name + ' (مدير النظام)';
       }
       const today = todayISO();
